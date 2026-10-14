@@ -1,0 +1,9 @@
+# One env for LoRA training (LLaMA-Factory) and eval (vLLM). Linux + NVIDIA GPU only.
+vllm==0.11.0
+llamafactory==0.9.5
+torch==2.8.0
+transformers==4.56.2
+peft==0.18.1
+trl==0.24.0
+accelerate==1.11.0
+datasets==4.0.0

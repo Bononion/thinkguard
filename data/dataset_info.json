@@ -1,0 +1,10 @@
+{
+  "critique": {
+    "file_name": "beavertails_critiques_aug.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}
