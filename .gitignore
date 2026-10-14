@@ -2,4 +2,6 @@ data/beavertails_critiques_aug.json
 data/label_only.json
 data/test/beavertails.jsonl
 data/val/beavertails_val.jsonl
+data/test/toxicchat.jsonl
+data/test/openai_mod.jsonl
 .venv/
