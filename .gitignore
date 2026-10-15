@@ -5,3 +5,6 @@ data/val/beavertails_val.jsonl
 data/test/toxicchat.jsonl
 data/test/openai_mod.jsonl
 .venv/
+
+__pycache__/
+*.pyc
