@@ -1,0 +1,25 @@
+model,benchmark,metric,value,table
+zero_shot,beavertails,f1,64.5,Table 1
+zero_shot,beavertails,auprc,87.9,Table 1
+zero_shot,toxicchat,f1,43.4,Table 1
+zero_shot,toxicchat,auprc,55.6,Table 1
+zero_shot,openai_mod,f1,77.2,Table 1
+zero_shot,openai_mod,auprc,80.2,Table 1
+label_only,beavertails,f1,83.7,Table 1
+label_only,beavertails,auprc,91.0,Table 1
+label_only,toxicchat,f1,56.0,Table 1
+label_only,toxicchat,auprc,59.1,Table 1
+label_only,openai_mod,f1,75.6,Table 1
+label_only,openai_mod,auprc,80.9,Table 1
+thinkguard,beavertails,f1,82.7,Table 1
+thinkguard,beavertails,auprc,91.7,Table 1
+thinkguard,toxicchat,f1,63.5,Table 1
+thinkguard,toxicchat,auprc,65.3,Table 1
+thinkguard,openai_mod,f1,77.3,Table 1
+thinkguard,openai_mod,auprc,80.7,Table 1
+zero_shot,beavertails,accuracy,65.2,Table 3
+zero_shot,beavertails,macro_f1,49.4,Table 3
+label_only,beavertails,accuracy,79.1,Table 3
+label_only,beavertails,macro_f1,75.4,Table 3
+thinkguard,beavertails,accuracy,81.6,Table 3
+thinkguard,beavertails,macro_f1,77.5,Table 3
