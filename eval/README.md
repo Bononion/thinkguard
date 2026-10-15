@@ -59,6 +59,64 @@ All checks ran on Windows with the `meta-llama/Llama-Guard-3-8B` tokenizer only 
 | lg3 `"\n\n"` | 19193 (`safe`) | 39257 (`unsafe`) |
 | train `"- Safety Assessment:"` | 6220 (`Ġsafe`) | 20451 (`Ġunsafe`) |
 
+## Colab T4
+
+These are the GPU acceptance checks on a free Colab T4 (16 GB, no bf16), set up the same way as the smoke test in the top-level README.
+
+Before you start:
+- Set Runtime → Change runtime type → T4 GPU.
+- Add `HF_TOKEN` in Secrets (the key icon) and allow notebook access. The token's account needs access to `meta-llama/Llama-Guard-3-8B`.
+- Push `phase-3-eval` first, because the cell clones it from GitHub.
+
+Cell 1:
+
+```python
+import os
+from google.colab import userdata
+os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+```
+
+Cell 2:
+
+```bash
+%%bash
+set -euo pipefail
+export HF_HOME=/content/hf_cache CKPT_DIR=/content/checkpoints   # /content is wiped with the runtime; fine for checks
+cd /content
+[ -d thinkguard ] || git clone https://github.com/Bononion/thinkguard.git
+cd thinkguard
+git checkout phase-3-eval && git pull --ff-only
+bash scripts/get_data.sh
+[ -d .venv ] || bash scripts/setup_env.sh   # if setup ever fails midway: rm -rf .venv, then re-run
+source .venv/bin/activate
+for b in beavertails toxicchat openai_mod; do python scripts/prep_eval.py $b; done   # data/test/ is gitignored
+
+T4="--dtype half --cpu-offload-gb 6 --enforce-eager"
+LG3=meta-llama/Llama-Guard-3-8B
+TG=Rakancorle1/ThinkGuard
+python eval/infer.py --model $LG3 --tag lg3_zeroshot --benchmark beavertails --prompt lg3 --inspect 5 $T4
+python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt lg3 --inspect 5 $T4
+python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt train --inspect 5 $T4
+python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt lg3 --limit 50 $T4
+python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt train --limit 50 $T4
+
+python - <<'EOF'
+import json
+for p in ("lg3", "train"):
+    path = f"results/preds/thinkguard_released/beavertails__{p}__agent.jsonl"
+    rows = [json.loads(line) for line in open(path, encoding="utf-8")]
+    parsed = [r for r in rows if r["pred"] is not None and r["p_unsafe"] is not None]
+    bad = [r["id"] for r in parsed if (r["pred"] == "unsafe") != (r["p_unsafe"] > 0.5)]
+    print(f"{path}: {len(rows)} rows, {len(rows) - len(parsed)} unparsed, pred/p_unsafe disagree on {bad}")
+    assert len(rows) == 50 and not bad
+EOF
+```
+
+What to look for:
+- **`--inspect`, `lg3`:** each raw output should start with `safe` or `unsafe`. That confirms the `"\n\n"` prefix.
+- **`--inspect`, `train`:** each raw output should start with ` safe` or ` unsafe`, then continue on the next line.
+- **The 50-row runs:** the unparsed count should be 0 or close to it.
+
 ## Versions (pins for the training environment)
 
 Check B ran against these versions:

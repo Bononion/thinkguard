@@ -3,7 +3,7 @@
 Run from the repo root inside .venv:
     python eval/infer.py --model meta-llama/Llama-Guard-3-8B --tag zero_shot --benchmark beavertails --prompt lg3
     python eval/infer.py ... --show-prompt   # print row 0's prompt and exit; tokenizer only, no vllm needed
-    python eval/infer.py ... --inspect 5     # print 5 raw generations (256 tokens, no stop); writes nothing
+    python eval/infer.py ... --inspect 5     # print 5 raw generations (64 tokens, no stop); writes nothing
 Writes results/preds/<tag>/<benchmark>__<prompt>__<mode>.jsonl with {id, label, pred, p_unsafe, raw}.
 See eval/README.md for how each prompt format is rendered.
 """
@@ -145,7 +145,11 @@ def main():
     p.add_argument("--prefix", help=r"default: '\n\n' for lg3, '- Safety Assessment:' for train")
     p.add_argument("--limit", type=int, help="first N rows only")
     p.add_argument("--show-prompt", action="store_true", help="print row 0's prompt + prefix and exit")
-    p.add_argument("--inspect", type=int, metavar="N", help="print raw outputs for N rows (256 tokens, no stop); writes nothing")
+    p.add_argument("--inspect", type=int, metavar="N", help="print raw outputs for N rows (64 tokens, no stop); writes nothing")
+    # Same as scripts/smoke_vllm.py; a 16 GB T4 needs --dtype half --cpu-offload-gb 6 --enforce-eager
+    p.add_argument("--dtype", default="auto", help="pre-Ampere GPUs (e.g. V100, T4) need half")
+    p.add_argument("--cpu-offload-gb", type=float, default=0, help="GB of weights to keep in CPU RAM")
+    p.add_argument("--enforce-eager", action="store_true", help="skip CUDA graphs to save GPU memory")
     args = p.parse_args()
 
     rows = [json.loads(line) for line in open(f"data/test/{args.benchmark}.jsonl", encoding="utf-8")]
@@ -175,13 +179,14 @@ def main():
 
     if args.inspect:
         rows = rows[:args.inspect]
-        params = SamplingParams(temperature=0, max_tokens=256)
+        params = SamplingParams(temperature=0, max_tokens=64)
     else:
         params = SamplingParams(temperature=0, max_tokens=8, stop=["\n"], logprobs=20)
     # Token ids, not text, so vLLM runs exactly the checked ids instead of re-tokenizing
     ids =[encode(tok, render(args.prompt, mode, r) + prefix) for r in rows]
     # The native 131,072 context needs more KV cache than a 24 GB GPU has left; size it to the longest prompt
-    llm = LLM(model=args.model, max_model_len=max(map(len, ids)) + params.max_tokens)
+    llm = LLM(model=args.model, max_model_len=max(map(len, ids)) + params.max_tokens, dtype=args.dtype,
+              cpu_offload_gb=args.cpu_offload_gb, enforce_eager=args.enforce_eager)
     outs = [o.outputs[0] for o in llm.generate([{"prompt_token_ids": i} for i in ids], params)]
 
     if args.inspect:
