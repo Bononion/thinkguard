@@ -117,6 +117,71 @@ What to look for:
 - **`--inspect`, `train`:** each raw output should start with ` safe` or ` unsafe`, then continue on the next line.
 - **The 50-row runs:** the unparsed count should be 0 or close to it.
 
+## Zero-shot run on Colab (#11)
+
+Run this after the Colab T4 checks pass, since their `--inspect` output confirms the `"\n\n"` prefix. Same T4 runtime and `HF_TOKEN` secret. Budget about 3–4 GPU-hours, likely over 2 sessions.
+
+- Predictions go to Google Drive, through a link from `results/preds/zero_shot`. `infer.py` appends every 256 rows, so a disconnect loses at most one batch.
+- Weights stay in local `/content/hf_cache` (~16 GB, too big for free Drive). They download again after a disconnect.
+- After a disconnect, run Cells 1 and 2 again. Each `infer.py` command prints `skipping N rows already written` and runs only the rest.
+- Resume goes by file name only. A run with the same `--tag`, `--benchmark` and `--prompt` but a different `--model` or `--prefix` would append to the old rows, so delete the file to start over.
+
+Cell 1:
+
+```python
+import os
+from google.colab import drive, userdata
+drive.mount("/content/drive")
+os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+```
+
+Cell 2:
+
+```bash
+%%bash
+set -euo pipefail
+export HF_HOME=/content/hf_cache CKPT_DIR=/content/checkpoints   # weights on local disk, not Drive
+cd /content
+[ -d thinkguard ] || git clone https://github.com/Bononion/thinkguard.git
+cd thinkguard
+git checkout phase-3-eval && git pull --ff-only
+bash scripts/get_data.sh
+[ -d .venv ] || bash scripts/setup_env.sh
+source .venv/bin/activate
+for b in beavertails toxicchat openai_mod; do python scripts/prep_eval.py $b; done
+
+DRIVE=/content/drive/MyDrive/thinkguard/preds/zero_shot
+mkdir -p "$DRIVE" results/preds
+if [ -e results/preds/zero_shot ] && [ ! -L results/preds/zero_shot ]; then
+  echo "ERROR: results/preds/zero_shot is a folder, not the Drive link. Move it (mv results/preds/zero_shot results/preds/zero_shot.local) and rerun." >&2
+  exit 1
+fi
+ln -sfn "$DRIVE" results/preds/zero_shot   # infer.py writes results/preds/zero_shot/*.jsonl straight to Drive
+T4="--dtype half --cpu-offload-gb 6 --enforce-eager"
+LG3=meta-llama/Llama-Guard-3-8B
+python eval/infer.py --model $LG3 --tag zero_shot --benchmark openai_mod --prompt lg3 $T4               # user mode: no responses
+python eval/infer.py --model $LG3 --tag zero_shot --benchmark beavertails --prompt lg3 $T4              # agent mode
+python eval/infer.py --model $LG3 --tag zero_shot --benchmark toxicchat --prompt lg3 --mode user $T4    # its label rates the user prompt
+
+python - <<'EOF'
+import json
+for b, mode in [("openai_mod", "user"), ("beavertails", "agent"), ("toxicchat", "user")]:
+    path = f"results/preds/zero_shot/{b}__lg3__{mode}.jsonl"
+    n = sum(1 for _ in open(f"data/test/{b}.jsonl", encoding="utf-8"))
+    rows = [json.loads(line) for line in open(path, encoding="utf-8")]
+    parsed = [r for r in rows if r["pred"] is not None and r["p_unsafe"] is not None]
+    bad = [r["id"] for r in parsed if (r["pred"] == "unsafe") != (r["p_unsafe"] > 0.5)]
+    print(f"{path}: {len(rows)} of {n} rows, {len(rows) - len(parsed)} unparsed, "
+          f"{len(bad)} pred/p_unsafe disagreements {bad[:5]}")
+    assert len(rows) == n and len(parsed) == n and not bad
+EOF
+```
+
+Then, on your machine in the repo root:
+
+1. Download the three files from Drive folder `MyDrive/thinkguard/preds/zero_shot/` into `results/preds/zero_shot/`.
+2. Run `python eval/metrics.py --tag zero_shot`. It writes the zero-shot rows of `results/scores.csv`.
+
 ## Versions (pins for the training environment)
 
 Check B ran against these versions:

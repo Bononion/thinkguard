@@ -4,7 +4,8 @@ Run from the repo root inside .venv:
     python eval/infer.py --model meta-llama/Llama-Guard-3-8B --tag zero_shot --benchmark beavertails --prompt lg3
     python eval/infer.py ... --show-prompt   # print row 0's prompt and exit; tokenizer only, no vllm needed
     python eval/infer.py ... --inspect 5     # print 5 raw generations (64 tokens, no stop); writes nothing
-Writes results/preds/<tag>/<benchmark>__<prompt>__<mode>.jsonl with {id, label, pred, p_unsafe, raw}.
+Writes results/preds/<tag>/<benchmark>__<prompt>__<mode>.jsonl with {id, label, pred, p_unsafe, raw}, appending
+every BATCH rows. Rerunning the same command resumes: ids already in the file are skipped (delete it to start over).
 See eval/README.md for how each prompt format is rendered.
 """
 import argparse
@@ -19,6 +20,7 @@ from transformers import AutoTokenizer
 TRAIN = "data/beavertails_critiques_aug.json"
 # Text forced after the prompt; generation and the label tokens start right after it
 PREFIX = {"lg3": "\n\n", "train": "- Safety Assessment:"}
+BATCH = 256  # rows per generate call; each batch is appended when it finishes, so a disconnect loses at most one
 
 # PROMPT_TEMPLATE_3 with all LLAMA_GUARD_3_CATEGORY entries and with_policy=True, from llama-recipes 0.0.5.post2
 # (llama-cookbook 0.0.5.post1): the prompt the authors' ThinkGuard.py builds. \x20 keeps 14 trailing spaces visible.
@@ -135,6 +137,21 @@ def p_unsafe(logprobs, unsafe_id, safe_id):
     return pu / (pu + ps)
 
 
+def resume(out, rows):
+    """Rows already in out, and the rows of `rows` whose id is not in it yet."""
+    if not os.path.exists(out):
+        return [], rows
+    data = open(out, "rb").read()
+    # Every row is written as one line ending in "\n", so anything after the last "\n" is a row cut off mid-write
+    end = data.rfind(b"\n") + 1
+    if end < len(data):
+        os.truncate(out, end)  # cut in place: rewriting the whole file could lose it to a second crash
+        print(f"{out}: removed a last line cut off mid-write ({len(data) - end} bytes)", flush=True)
+    done = [json.loads(line) for line in data[:end].decode("utf-8").split("\n") if line]
+    ids = {r["id"] for r in done}
+    return done, [r for r in rows if r["id"] not in ids]
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--model", required=True, help="HF id or local path; its tokenizer is used too")
@@ -175,6 +192,14 @@ def main():
               f"first label tokens: unsafe={unsafe_id}, safe={safe_id}]", file=sys.stderr)
         return
 
+    if not args.inspect:
+        out = f"results/preds/{args.tag}/{args.benchmark}__{args.prompt}__{mode}.jsonl"
+        n = len(rows)
+        preds, rows = resume(out, rows)
+        print(f"{out}: skipping {n - len(rows)} rows already written, {len(rows)} to run", flush=True)
+        if not rows:
+            return
+
     from vllm import LLM, SamplingParams  # imported here so --show-prompt runs without vllm
 
     if args.inspect:
@@ -187,19 +212,22 @@ def main():
     # The native 131,072 context needs more KV cache than a 24 GB GPU has left; size it to the longest prompt
     llm = LLM(model=args.model, max_model_len=max(map(len, ids)) + params.max_tokens, dtype=args.dtype,
               cpu_offload_gb=args.cpu_offload_gb, enforce_eager=args.enforce_eager)
-    outs = [o.outputs[0] for o in llm.generate([{"prompt_token_ids": i} for i in ids], params)]
-
     if args.inspect:
+        outs = [o.outputs[0] for o in llm.generate([{"prompt_token_ids": i} for i in ids], params)]
         for r, o in zip(rows, outs):
             print(f"--- {r['id']} (label: {r['label']})\n{o.text}")
         return
 
-    preds = [{"id": r["id"], "label": r["label"], "pred": parse(o.text),
-              "p_unsafe": p_unsafe(o.logprobs[0], unsafe_id, safe_id), "raw": o.text} for r, o in zip(rows, outs)]
-    out = f"results/preds/{args.tag}/{args.benchmark}__{args.prompt}__{mode}.jsonl"
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w", encoding="utf-8", newline="\n") as f:
-        f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in preds)
+    for start in range(0, len(rows), BATCH):
+        batch = rows[start:start + BATCH]
+        outs = [o.outputs[0] for o in llm.generate([{"prompt_token_ids": i} for i in ids[start:start + BATCH]], params)]
+        new = [{"id": r["id"], "label": r["label"], "pred": parse(o.text),
+                "p_unsafe": p_unsafe(o.logprobs[0], unsafe_id, safe_id), "raw": o.text} for r, o in zip(batch, outs)]
+        with open(out, "a", encoding="utf-8", newline="\n") as f:  # closing flushes the batch to the file
+            f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in new)
+        preds += new
+        print(f"{out}: {start + len(batch)} of {len(rows)} rows to run written", flush=True)
     no_text = sum(r["pred"] is None for r in preds)
     no_token = sum(r["p_unsafe"] is None for r in preds)
     unparsed = sum(r["pred"] is None or r["p_unsafe"] is None for r in preds)
