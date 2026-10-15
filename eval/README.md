@@ -97,7 +97,7 @@ TG=Rakancorle1/ThinkGuard
 python eval/infer.py --model $LG3 --tag lg3_zeroshot --benchmark beavertails --prompt lg3 --inspect 5 $T4
 python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt lg3 --inspect 5 $T4
 python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt train --inspect 5 $T4
-python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt lg3 --limit 50 $T4
+python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt lg3 --prefix $'\n\n- Safety Assessment:' --limit 50 $T4
 python eval/infer.py --model $TG --tag thinkguard_released --benchmark beavertails --prompt train --limit 50 $T4
 
 python - <<'EOF'
@@ -108,7 +108,7 @@ for p in ("lg3", "train"):
     parsed = [r for r in rows if r["pred"] is not None and r["p_unsafe"] is not None]
     bad = [r["id"] for r in parsed if (r["pred"] == "unsafe") != (r["p_unsafe"] > 0.5)]
     print(f"{path}: {len(rows)} rows, {len(rows) - len(parsed)} unparsed, pred/p_unsafe disagree on {bad}")
-    assert len(rows) == 50 and not bad
+    assert len(rows) == 50 and len(parsed) == 50 and not bad
 EOF
 ```
 
