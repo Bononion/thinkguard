@@ -4,7 +4,7 @@
 
 Source: `data/raw/critique/beavertails_critiques_aug.json`, 15000 rows. Flagged rows: `reports/critique_flags.jsonl` (8 lines).
 
-Label source: the paper's critics were given the gold BeaverTails label for each conversation (proven in #42).
+Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.
 
 - Fields: rows with an empty or non-string field: instruction 0, input 0, output 0
 - Instruction: 1 distinct string(s), length(s) 631 chars

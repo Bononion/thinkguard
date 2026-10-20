@@ -4,14 +4,17 @@ Run from the repo root: python -m thinkguard.data.download --config configs/data
 A source whose file already matches its manifest sha256 is skipped. A file that differs from its manifest entry
 is an error, and the manifest is left unchanged.
 """
+
 import argparse
 import gzip
 import hashlib
 import json
+import lzma
 import os
 import shutil
 import urllib.request
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -34,13 +37,22 @@ def read_json(path):
     return data
 
 
-def read_jsonl_gz(path):
-    """Rows of a gzipped file with one JSON object per non-empty line."""
-    with gzip.open(path, "rt", encoding="utf-8") as f:
+def read_jsonl(path, opener):
+    """Rows of a compressed file with one JSON object per non-empty line; opener is gzip.open or lzma.open."""
+    with opener(path, "rt", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
 
 
-READERS = {"json": (read_json, "array"), "jsonl.gz": (read_jsonl_gz, "jsonl")}  # format -> (reader, schema type)
+READERS = {  # format -> (reader, schema type)
+    "json": (read_json, "array"),
+    "jsonl.gz": (partial(read_jsonl, opener=gzip.open), "jsonl"),
+    "jsonl.xz": (partial(read_jsonl, opener=lzma.open), "jsonl"),
+}
+
+
+def target_path(name, url, raw_dir=RAW_DIR):
+    """Where a source's file lives: data/raw/<name>/<file name from the URL>."""
+    return raw_dir / name / Path(urlparse(url).path).name
 
 
 def describe(source, rows):
@@ -105,7 +117,7 @@ def freeze(source, raw_dir=RAW_DIR, manifest_path=MANIFEST):
     if fmt not in READERS:
         raise ValueError(f"source {name}: unknown format {fmt!r} (known: {', '.join(READERS)})")
     url = source["url"].format(revision=source["revision"])
-    target = raw_dir / name / Path(urlparse(url).path).name
+    target = target_path(name, url, raw_dir)
     manifest = load_manifest(manifest_path)
     expected = manifest.get(name, {}).get("sha256")
 

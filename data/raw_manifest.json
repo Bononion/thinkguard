@@ -36,6 +36,117 @@
     "unsafe_rows": 1733,
     "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/8401fe609d288129cc684a9b3be6a93e41cfe678/round0/30k/test.jsonl.gz"
   },
+  "beavertails_30k_train": {
+    "bytes": 4948694,
+    "dict_keys": {
+      "category": [
+        "animal_abuse",
+        "child_abuse",
+        "controversial_topics,politics",
+        "discrimination,stereotype,injustice",
+        "drug_abuse,weapons,banned_substance",
+        "financial_crime,property_crime,theft",
+        "hate_speech,offensive_language",
+        "misinformation_regarding_ethics,laws_and_safety",
+        "non_violent_unethical_behavior",
+        "privacy_violation",
+        "self_harm",
+        "sexually_explicit,adult_content",
+        "terrorism,organized_crime",
+        "violence,aiding_and_abetting,incitement"
+      ]
+    },
+    "downloaded_at": "2026-10-20T18:55:17+00:00",
+    "revision": "8401fe609d288129cc684a9b3be6a93e41cfe678",
+    "rows": 27186,
+    "schema": {
+      "row_keys": [
+        "category",
+        "is_safe",
+        "prompt",
+        "response"
+      ],
+      "type": "jsonl"
+    },
+    "sha256": "2e24b85dd599224eeb7379da297223bad50e11fea9fee6a7fdb4bd26aedec315",
+    "split": "train",
+    "unsafe_rows": 15582,
+    "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/8401fe609d288129cc684a9b3be6a93e41cfe678/round0/30k/train.jsonl.gz"
+  },
+  "beavertails_330k_test": {
+    "bytes": 2436728,
+    "dict_keys": {
+      "category": [
+        "animal_abuse",
+        "child_abuse",
+        "controversial_topics,politics",
+        "discrimination,stereotype,injustice",
+        "drug_abuse,weapons,banned_substance",
+        "financial_crime,property_crime,theft",
+        "hate_speech,offensive_language",
+        "misinformation_regarding_ethics,laws_and_safety",
+        "non_violent_unethical_behavior",
+        "privacy_violation",
+        "self_harm",
+        "sexually_explicit,adult_content",
+        "terrorism,organized_crime",
+        "violence,aiding_and_abetting,incitement"
+      ]
+    },
+    "downloaded_at": "2026-10-20T18:55:26+00:00",
+    "revision": "8401fe609d288129cc684a9b3be6a93e41cfe678",
+    "rows": 33396,
+    "schema": {
+      "row_keys": [
+        "category",
+        "is_safe",
+        "prompt",
+        "response"
+      ],
+      "type": "jsonl"
+    },
+    "sha256": "1c726c662b85bf4761913041fe9e098f80e5206344864597dbde86bc9a1bfc96",
+    "split": "test",
+    "unsafe_rows": 18689,
+    "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/8401fe609d288129cc684a9b3be6a93e41cfe678/round0/330k/test.jsonl.xz"
+  },
+  "beavertails_330k_train": {
+    "bytes": 31061396,
+    "dict_keys": {
+      "category": [
+        "animal_abuse",
+        "child_abuse",
+        "controversial_topics,politics",
+        "discrimination,stereotype,injustice",
+        "drug_abuse,weapons,banned_substance",
+        "financial_crime,property_crime,theft",
+        "hate_speech,offensive_language",
+        "misinformation_regarding_ethics,laws_and_safety",
+        "non_violent_unethical_behavior",
+        "privacy_violation",
+        "self_harm",
+        "sexually_explicit,adult_content",
+        "terrorism,organized_crime",
+        "violence,aiding_and_abetting,incitement"
+      ]
+    },
+    "downloaded_at": "2026-10-20T18:55:25+00:00",
+    "revision": "8401fe609d288129cc684a9b3be6a93e41cfe678",
+    "rows": 300567,
+    "schema": {
+      "row_keys": [
+        "category",
+        "is_safe",
+        "prompt",
+        "response"
+      ],
+      "type": "jsonl"
+    },
+    "sha256": "12f04c9200000929ebbc616c29cb53331f6df36e7341d73e4a12cffac0eb1c08",
+    "split": "train",
+    "unsafe_rows": 166382,
+    "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/8401fe609d288129cc684a9b3be6a93e41cfe678/round0/330k/train.jsonl.xz"
+  },
   "critique": {
     "bytes": 46661092,
     "downloaded_at": "2026-10-20T15:16:05+00:00",
