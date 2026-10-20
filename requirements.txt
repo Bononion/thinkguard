@@ -1,0 +1,11 @@
+# HF + PEFT env for LoRA training and eval. Linux + NVIDIA GPU, Python 3.11; installed by scripts/setup_env.sh.
+# Top-level pins only; the exact lock of every dependency comes in #38.
+torch==2.8.0
+transformers==4.57.1
+peft==0.18.1
+accelerate==1.11.0
+datasets==4.0.0
+scikit-learn==1.9.1
+pyyaml==6.0.3
+pytest==9.1.1
+ruff==0.17.1
