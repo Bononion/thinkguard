@@ -1,4 +1,41 @@
 {
+  "beavertails_30k_test": {
+    "bytes": 545222,
+    "dict_keys": {
+      "category": [
+        "animal_abuse",
+        "child_abuse",
+        "controversial_topics,politics",
+        "discrimination,stereotype,injustice",
+        "drug_abuse,weapons,banned_substance",
+        "financial_crime,property_crime,theft",
+        "hate_speech,offensive_language",
+        "misinformation_regarding_ethics,laws_and_safety",
+        "non_violent_unethical_behavior",
+        "privacy_violation",
+        "self_harm",
+        "sexually_explicit,adult_content",
+        "terrorism,organized_crime",
+        "violence,aiding_and_abetting,incitement"
+      ]
+    },
+    "downloaded_at": "2026-10-20T17:35:58+00:00",
+    "revision": "8401fe609d288129cc684a9b3be6a93e41cfe678",
+    "rows": 3021,
+    "schema": {
+      "row_keys": [
+        "category",
+        "is_safe",
+        "prompt",
+        "response"
+      ],
+      "type": "jsonl"
+    },
+    "sha256": "0ce619bf4c421c12e578445b1fb8d1aedf4bf05ca3eb985f4ddf498a784769ff",
+    "split": "test",
+    "unsafe_rows": 1733,
+    "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/8401fe609d288129cc684a9b3be6a93e41cfe678/round0/30k/test.jsonl.gz"
+  },
   "critique": {
     "bytes": 46661092,
     "downloaded_at": "2026-10-20T15:16:05+00:00",

@@ -5,3 +5,10 @@
   revision: a7d0c8924a343009e9fd4b31aa84ac845b1ff454
   format: json  # a top-level JSON array
   split: train
+- name: beavertails_30k_test
+  url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/30k/test.jsonl.gz
+  revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
+  format: jsonl.gz
+  split: test
+  unsafe: {field: is_safe, equals: false}
+  dict_keys: category
