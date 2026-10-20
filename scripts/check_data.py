@@ -20,14 +20,14 @@ with open(PATH, encoding="utf-8") as f:
 counts = {label: dict.fromkeys(EXPECTED[label], 0) for label in EXPECTED}
 unparsed = 0
 for row in rows:
-    m = re.search(r"^- Safety Assessment: (safe|unsafe)\b", row["output"], re.M)
+    m = re.search(r"^- Safety Assessment: (safe|unsafe)\b", row["output"], re.MULTILINE)
     if not m:
         unparsed += 1
         continue
     c = counts[m.group(1)]
     c["rows"] += 1
     for h in HEADERS:
-        c[h] += bool(re.search(rf"^- {h}:", row["output"], re.M))
+        c[h] += bool(re.search(rf"^- {h}:", row["output"], re.MULTILINE))
 
 ok = len(rows) == EXPECTED_ROWS and unparsed == 0 and counts == EXPECTED
 print(f"rows: {len(rows)} (expected {EXPECTED_ROWS}), unparsed labels: {unparsed}")

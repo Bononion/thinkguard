@@ -11,7 +11,7 @@ from datasets import get_dataset_split_names, load_dataset
 
 PATH = "data/beavertails_critiques_aug.json"
 REPO = "PKU-Alignment/BeaverTails"
-INPUT = re.compile(r"^User: (.*?)\nAgent: (.*)$", re.S)
+INPUT = re.compile(r"^User: (.*?)\nAgent: (.*)$", re.DOTALL)
 
 
 def key(prompt, response):
