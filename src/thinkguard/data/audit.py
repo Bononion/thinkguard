@@ -180,7 +180,7 @@ def render(stats, keys, n_flags):
         "",
         f"Source: `{CRITIQUE.as_posix()}`, {stats['rows']} rows. Flagged rows: `{FLAGS.as_posix()}` ({n_flags} lines).",
         "",
-        "Label source: the paper's critics were given the gold BeaverTails label for each conversation (proven in #42).",
+        "Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.",
         "",
         "- Fields: rows with an empty or non-string field: "
         + ", ".join(f"{k} {stats['empty_fields'][k]}" for k in FIELDS),

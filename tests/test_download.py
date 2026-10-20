@@ -1,7 +1,9 @@
 """thinkguard.data.download against a local file:// source (no network)."""
+
 import gzip
 import hashlib
 import json
+import lzma
 from pathlib import Path
 
 import pytest
@@ -98,3 +100,15 @@ def test_jsonl_gz_fails_when_dict_keys_differ(src):
         run(write_gz(src, rows), "jsonl.gz", **GZ_STATS)
     assert not download.MANIFEST.exists()
     assert not Path("data/raw/tiny/tiny.jsonl.gz").exists()
+
+
+def test_jsonl_xz_counts_unsafe_rows_and_dict_keys(src):
+    path = src.with_name("tiny.jsonl.xz")
+    with lzma.open(path, "wt", encoding="utf-8") as f:
+        f.writelines(json.dumps(r) + "\n" for r in GZ_ROWS)
+        f.write("\n")
+    entry = run(path, "jsonl.xz", **GZ_STATS)["tiny"]
+    assert Path("data/raw/tiny/tiny.jsonl.xz").read_bytes() == path.read_bytes()
+    assert (entry["rows"], entry["unsafe_rows"]) == (3, 2)
+    assert entry["schema"] == {"type": "jsonl", "row_keys": ["category", "is_safe"]}
+    assert entry["dict_keys"] == {"category": ["b", "a"]}
