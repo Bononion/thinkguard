@@ -1,1 +1,14 @@
 data/beavertails_critiques_aug.json
+data/raw/
+data/interim/
+
+.venv/
+__pycache__/
+*.egg-info/
+
+# Keep the folders in git, not the weights
+checkpoints/*
+!checkpoints/.gitkeep
+runs/**/*.safetensors
+runs/**/*.bin
+runs/**/*.pt
