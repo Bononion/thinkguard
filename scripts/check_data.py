@@ -1,13 +1,13 @@
 """Check the ThinkGuard critique training data against the known counts.
 
-Run from the repo root after scripts/get_data.sh: python scripts/check_data.py
+Run from the repo root after python -m thinkguard.data.download --config configs/data/sources.yaml: python scripts/check_data.py
 Exits 1 if any count differs. Safe outputs have no Categories line.
 """
 import json
 import re
 import sys
 
-PATH = "data/beavertails_critiques_aug.json"
+PATH = "data/raw/critique/beavertails_critiques_aug.json"
 HEADERS = ["Safety Assessment", "Categories", "Explanation"]
 EXPECTED = {
     "unsafe": {"rows": 8526, "Safety Assessment": 8526, "Categories": 8526, "Explanation": 8526},

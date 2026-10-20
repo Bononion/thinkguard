@@ -1,0 +1,19 @@
+{
+  "critique": {
+    "bytes": 46661092,
+    "downloaded_at": "2026-10-20T15:16:05+00:00",
+    "revision": "a7d0c8924a343009e9fd4b31aa84ac845b1ff454",
+    "rows": 15000,
+    "schema": {
+      "row_keys": [
+        "input",
+        "instruction",
+        "output"
+      ],
+      "type": "array"
+    },
+    "sha256": "fe9907dd85de40134b508cbb32beb5bb13eda815584f1d2019c83c19412ff3d8",
+    "split": "train",
+    "url": "https://raw.githubusercontent.com/luka-group/ThinkGuard/a7d0c8924a343009e9fd4b31aa84ac845b1ff454/data/beavertails_critiques_aug.json"
+  }
+}

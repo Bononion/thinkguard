@@ -1,6 +1,6 @@
 """Find which BeaverTails split the 15k ThinkGuard training rows came from.
 
-Run from the repo root after scripts/get_data.sh: python scripts/check_source_split.py
+Run from the repo root after python -m thinkguard.data.download --config configs/data/sources.yaml: python scripts/check_source_split.py
 Matches conversations on (prompt, response) with whitespace collapsed.
 """
 import json
@@ -9,7 +9,7 @@ import sys
 
 from datasets import get_dataset_split_names, load_dataset
 
-PATH = "data/beavertails_critiques_aug.json"
+PATH = "data/raw/critique/beavertails_critiques_aug.json"
 REPO = "PKU-Alignment/BeaverTails"
 INPUT = re.compile(r"^User: (.*?)\nAgent: (.*)$", re.DOTALL)
 
