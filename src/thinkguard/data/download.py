@@ -5,6 +5,7 @@ A source whose file already matches its manifest sha256 is skipped. A file that 
 is an error, and the manifest is left unchanged.
 """
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -24,19 +25,41 @@ class HashMismatch(Exception):
     pass
 
 
-def describe_json(path):
-    """Rows and schema of a file holding a top-level JSON array."""
+def read_json(path):
+    """Rows of a file holding a top-level JSON array."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
         raise TypeError(f"{path}: expected a top-level JSON array, got {type(data).__name__}")
-    schema = {"type": "array"}
-    if data and isinstance(data[0], dict):
-        schema["row_keys"] = sorted(data[0])
-    return len(data), schema
+    return data
 
 
-DESCRIBE = {"json": describe_json}  # format -> (rows, schema) reader
+def read_jsonl_gz(path):
+    """Rows of a gzipped file with one JSON object per non-empty line."""
+    with gzip.open(path, "rt", encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+READERS = {"json": (read_json, "array"), "jsonl.gz": (read_jsonl_gz, "jsonl")}  # format -> (reader, schema type)
+
+
+def describe(source, rows):
+    """Manifest fields computed from the rows: rows, schema, and unsafe_rows / dict_keys if the source asks."""
+    schema = {"type": READERS[source["format"]][1]}
+    if rows and isinstance(rows[0], dict):
+        schema["row_keys"] = sorted(rows[0])
+    info = {"rows": len(rows), "schema": schema}
+    if "unsafe" in source:
+        field, equals = source["unsafe"]["field"], source["unsafe"]["equals"]
+        info["unsafe_rows"] = sum(r[field] == equals for r in rows)
+    if "dict_keys" in source:
+        field = source["dict_keys"]
+        keys = list(rows[0][field])
+        for i, r in enumerate(rows):
+            if set(r[field]) != set(keys):
+                raise ValueError(f"source {source['name']}: row {i} {field} keys {list(r[field])} != row 0's {keys}")
+        info["dict_keys"] = {field: keys}
+    return info
 
 
 def load_sources(path):
@@ -79,8 +102,8 @@ def check(name, expected, actual, path):
 def freeze(source, raw_dir=RAW_DIR, manifest_path=MANIFEST):
     """Download one source unless its file already matches the manifest, then record it there."""
     name, fmt = source["name"], source["format"]
-    if fmt not in DESCRIBE:
-        raise ValueError(f"source {name}: unknown format {fmt!r} (known: {', '.join(DESCRIBE)})")
+    if fmt not in READERS:
+        raise ValueError(f"source {name}: unknown format {fmt!r} (known: {', '.join(READERS)})")
     url = source["url"].format(revision=source["revision"])
     target = raw_dir / name / Path(urlparse(url).path).name
     manifest = load_manifest(manifest_path)
@@ -99,7 +122,7 @@ def freeze(source, raw_dir=RAW_DIR, manifest_path=MANIFEST):
         digest = sha256(part)
         if expected:
             check(name, expected, digest, url)
-        rows, schema = DESCRIBE[fmt](part)
+        info = describe(source, READERS[fmt][0](part))
     except Exception:
         part.unlink()
         raise
@@ -110,13 +133,12 @@ def freeze(source, raw_dir=RAW_DIR, manifest_path=MANIFEST):
         "revision": source["revision"],
         "sha256": digest,
         "bytes": target.stat().st_size,
-        "rows": rows,
-        "schema": schema,
+        **info,
         "split": source["split"],
         "downloaded_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     save_manifest(manifest, manifest_path)
-    print(f"{name}: saved {target} ({rows} rows, sha256 {digest})")
+    print(f"{name}: saved {target} ({info['rows']} rows, sha256 {digest})")
 
 
 def main(argv=None):
