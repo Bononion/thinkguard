@@ -1,0 +1,110 @@
+[
+  {
+    "name": "thinkguard-paper",
+    "kind": "paper",
+    "url": "https://aclanthology.org/2025.findings-acl.704",
+    "revision": "10.18653/v1/2025.findings-acl.704",
+    "license": "CC BY 4.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "method and target numbers being reproduced"
+  },
+  {
+    "name": "layerskip-paper",
+    "kind": "paper",
+    "url": "https://aclanthology.org/2024.acl-long.681",
+    "revision": "10.18653/v1/2024.acl-long.681",
+    "license": "CC BY 4.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "early-exit extension method"
+  },
+  {
+    "name": "thinkguard-repo",
+    "kind": "repo",
+    "url": "https://github.com/luka-group/ThinkGuard",
+    "revision": "a7d0c8924a343009e9fd4b31aa84ac845b1ff454",
+    "license": "Apache-2.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "critique training data, reference inference"
+  },
+  {
+    "name": "layerskip-repo",
+    "kind": "repo",
+    "url": "https://github.com/facebookresearch/LayerSkip",
+    "revision": "494752e5fbb0a82989f6cb384841684b1c2ef5c3",
+    "license": "CC BY-NC 4.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "reference early-exit and self-speculative code"
+  },
+  {
+    "name": "trl-layerskip-example",
+    "kind": "repo",
+    "url": "https://github.com/huggingface/trl/tree/bfe20756082488350091352d1cdc19c172e42cd8/examples/research_projects/layer_skip",
+    "revision": "bfe20756082488350091352d1cdc19c172e42cd8",
+    "license": "Apache-2.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "reference LayerSkip SFT loss (PR #3111)"
+  },
+  {
+    "name": "openai-moderation",
+    "kind": "dataset",
+    "url": "https://github.com/openai/moderation-api-release",
+    "revision": "f4ab51b5edd3bfbcb349a56324274235b674e0e4",
+    "license": "MIT",
+    "accessed_at": "2026-10-20",
+    "used_for": "OOD test set"
+  },
+  {
+    "name": "llama-guard-3-8b",
+    "kind": "model",
+    "url": "https://huggingface.co/meta-llama/Llama-Guard-3-8B",
+    "revision": "7327bd9f6efbbe6101dc6cc4736302b3cbb6e425",
+    "license": "llama3.1",
+    "accessed_at": "2026-10-20",
+    "used_for": "backbone B"
+  },
+  {
+    "name": "llama-guard-3-1b",
+    "kind": "model",
+    "url": "https://huggingface.co/meta-llama/Llama-Guard-3-1B",
+    "revision": "acf7aafa60f0410f8f42b1fa35e077d705892029",
+    "license": "llama3.2",
+    "accessed_at": "2026-10-20",
+    "used_for": "debug model"
+  },
+  {
+    "name": "thinkguard-released",
+    "kind": "model",
+    "url": "https://huggingface.co/Rakancorle1/ThinkGuard",
+    "revision": "b202736aaed0b63d5ad67b45d67601b53db34205",
+    "license": "llama3.1",
+    "accessed_at": "2026-10-20",
+    "used_for": "released checkpoint R"
+  },
+  {
+    "name": "beavertails",
+    "kind": "dataset",
+    "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails",
+    "revision": "8401fe609d288129cc684a9b3be6a93e41cfe678",
+    "license": "CC BY-NC 4.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "in-distribution test set (30k_test)"
+  },
+  {
+    "name": "toxic-chat",
+    "kind": "dataset",
+    "url": "https://huggingface.co/datasets/lmsys/toxic-chat",
+    "revision": "29df8e4dba60e1f4af4b4075c0705c5b313548a8",
+    "license": "CC BY-NC 4.0",
+    "accessed_at": "2026-10-20",
+    "used_for": "OOD test set (toxicchat0124)"
+  },
+  {
+    "name": "wildguardmix",
+    "kind": "dataset",
+    "url": "https://huggingface.co/datasets/allenai/wildguardmix",
+    "revision": "d29c47f41c8b51348b5c8e8c81c039b3132b66d1",
+    "license": "ODC-BY",
+    "accessed_at": "2026-10-20",
+    "used_for": "OOD test set (WildGuardTest)"
+  }
+]
