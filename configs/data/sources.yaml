@@ -33,3 +33,17 @@
   split: test
   unsafe: {field: is_safe, equals: false}
   dict_keys: category
+- name: toxicchat_0124_test
+  url: https://huggingface.co/datasets/lmsys/toxic-chat/resolve/{revision}/data/0124/toxic-chat_annotation_test.csv
+  revision: 29df8e4dba60e1f4af4b4075c0705c5b313548a8
+  format: csv
+  split: test
+  unsafe: {field: toxicity, equals: "1"}  # CSV values are strings
+  label_fields: [toxicity, jailbreaking, human_annotation]
+- name: openai_moderation
+  url: https://raw.githubusercontent.com/openai/moderation-api-release/{revision}/data/samples-1680.jsonl.gz
+  revision: f4ab51b5edd3bfbcb349a56324274235b674e0e4
+  format: jsonl.gz
+  split: test
+  unsafe: {any_of: [S, H, V, HR, SH, S3, H2, V2], equals: 1}
+  label_fields: [S, H, V, HR, SH, S3, H2, V2]

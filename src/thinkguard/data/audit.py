@@ -1,7 +1,8 @@
 """Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
 
 Run from the repo root: python -m thinkguard.data.audit
-Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason).
+Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The report's
+Benchmarks section comes from data/raw_manifest.json and the unsafe rules in configs/data/sources.yaml.
 Exits 1 if any row has a parse_error or an unknown category.
 """
 
@@ -12,10 +13,26 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 
+from thinkguard.data import download
+
 CRITIQUE = Path("data/raw/critique/beavertails_critiques_aug.json")
 MANIFEST = Path("data/raw_manifest.json")
+SOURCES = Path("configs/data/sources.yaml")
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
+
+BENCHMARKS = ("toxicchat_0124_test", "openai_moderation")
+BENCHMARK_NOTES = (
+    "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
+    (
+        "- OpenAI Moderation is unsafe if any of S, H, V, HR, SH, S3, H2, V2 equals 1. The upstream README gives no"
+        " binary rule; this follows AI2's safety-eval (used for the WildGuard paper), which gives the same 522 positives."
+    ),
+    (
+        "- OpenAI Moderation: 925 rows lack a label for at least one category. Upstream says a missing label means"
+        " unknown; we count it as not flagged, as safety-eval does. No row lacks all 8."
+    ),
+)
 
 FIELDS = ("instruction", "input", "output")
 INPUT = re.compile(r"^User: (.*?)\nAgent: (.*)$", re.DOTALL)
@@ -211,10 +228,26 @@ def render(stats, keys, n_flags):
     return "\n".join(lines) + "\n"
 
 
-def write(stats, flags, keys, report=REPORT, flags_path=FLAGS):
+def render_benchmarks(manifest, sources):
+    """The "## Benchmarks" section. Missing label cells: total null count in label_counts over the gold-label fields."""
+    lines = [
+        "## Benchmarks",
+        "",
+        "| Benchmark | Gold-label field(s) | Rows | Positives | Missing label cells |",
+        "|---|---|---|---|---|",
+    ]
+    for name in BENCHMARKS:
+        entry, fields = manifest[name], download.unsafe_fields(sources[name]["unsafe"])
+        missing = sum(entry["label_counts"][f].get("null", 0) for f in fields)
+        gold = ", ".join(f"`{f}`" for f in fields)
+        lines.append(f"| `{name}` | {gold} | {entry['rows']} | {entry['unsafe_rows']} | {missing} |")
+    return "\n".join([*lines, "", *BENCHMARK_NOTES]) + "\n"
+
+
+def write(text, flags, report=REPORT, flags_path=FLAGS):
     report.parent.mkdir(parents=True, exist_ok=True)
     with open(report, "w", encoding="utf-8", newline="\n") as f:
-        f.write("# Data audit\n\n" + render(stats, keys, len(flags)))
+        f.write(text)
     with open(flags_path, "w", encoding="utf-8", newline="\n") as f:
         f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in flags)
 
@@ -224,8 +257,11 @@ def main():
         rows = json.load(f)
     keys = load_keys()
     stats, flags = audit(rows, keys)
-    write(stats, flags, keys)
-    print(render(stats, keys, len(flags)))
+    sources = {s["name"]: s for s in download.load_sources(SOURCES)}
+    benchmarks = render_benchmarks(download.load_manifest(MANIFEST), sources)
+    text = "# Data audit\n\n" + render(stats, keys, len(flags)) + "\n" + benchmarks
+    write(text, flags)
+    print(text)
     parse_errors = sum(r["reason"] == "parse_error" for r in flags)
     unknown = sum(r["reason"] == "unknown_category" for r in flags)
     if parse_errors or unknown:

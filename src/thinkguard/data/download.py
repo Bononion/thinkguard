@@ -6,6 +6,7 @@ is an error, and the manifest is left unchanged.
 """
 
 import argparse
+import csv
 import gzip
 import hashlib
 import json
@@ -13,6 +14,7 @@ import lzma
 import os
 import shutil
 import urllib.request
+from collections import Counter
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -43,7 +45,14 @@ def read_jsonl(path, opener):
         return [json.loads(line) for line in f if line.strip()]
 
 
+def read_csv(path):
+    """Rows of a CSV file with a header line, as dicts of strings."""
+    with open(path, encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
 READERS = {  # format -> (reader, schema type)
+    "csv": (read_csv, "csv"),
     "json": (read_json, "array"),
     "jsonl.gz": (partial(read_jsonl, opener=gzip.open), "jsonl"),
     "jsonl.xz": (partial(read_jsonl, opener=lzma.open), "jsonl"),
@@ -55,15 +64,27 @@ def target_path(name, url, raw_dir=RAW_DIR):
     return raw_dir / name / Path(urlparse(url).path).name
 
 
+def unsafe_fields(rule):
+    """The gold-label fields of a source's unsafe rule: {field, equals} or {any_of: [fields], equals}."""
+    return rule["any_of"] if "any_of" in rule else [rule["field"]]
+
+
 def describe(source, rows):
-    """Manifest fields computed from the rows: rows, schema, and unsafe_rows / dict_keys if the source asks."""
+    """Manifest fields computed from the rows: rows, schema, and unsafe_rows / dict_keys / label_counts if the
+    source asks. A row is unsafe once if any of its unsafe_fields equals the rule's value.
+    """
     schema = {"type": READERS[source["format"]][1]}
     if rows and isinstance(rows[0], dict):
         schema["row_keys"] = sorted(rows[0])
     info = {"rows": len(rows), "schema": schema}
     if "unsafe" in source:
-        field, equals = source["unsafe"]["field"], source["unsafe"]["equals"]
-        info["unsafe_rows"] = sum(r[field] == equals for r in rows)
+        rule = source["unsafe"]
+        info["unsafe_rows"] = sum(any(r.get(f) == rule["equals"] for f in unsafe_fields(rule)) for r in rows)
+    if "label_fields" in source:
+        # Keys are strings so the manifest stays valid sorted JSON; a missing field counts as null
+        info["label_counts"] = {
+            f: dict(Counter("null" if r.get(f) is None else str(r[f]) for r in rows)) for f in source["label_fields"]
+        }
     if "dict_keys" in source:
         field = source["dict_keys"]
         keys = list(rows[0][field])
