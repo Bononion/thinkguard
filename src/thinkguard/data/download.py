@@ -2,7 +2,8 @@
 
 Run from the repo root: python -m thinkguard.data.download --config configs/data/sources.yaml
 A source whose file already matches its manifest sha256 is skipped. A file that differs from its manifest entry
-is an error, and the manifest is left unchanged.
+is an error, and the manifest is left unchanged. Requests to huggingface.co send HF_TOKEN if it is set; a source
+marked gated needs it.
 """
 
 import argparse
@@ -51,11 +52,19 @@ def read_csv(path):
         return list(csv.DictReader(f))
 
 
+def read_parquet(path):
+    """Rows of a Parquet file, as dicts."""
+    import pyarrow.parquet  # only parquet sources need pyarrow
+
+    return pyarrow.parquet.read_table(path).to_pylist()
+
+
 READERS = {  # format -> (reader, schema type)
     "csv": (read_csv, "csv"),
     "json": (read_json, "array"),
     "jsonl.gz": (partial(read_jsonl, opener=gzip.open), "jsonl"),
     "jsonl.xz": (partial(read_jsonl, opener=lzma.open), "jsonl"),
+    "parquet": (read_parquet, "parquet"),
 }
 
 
@@ -123,7 +132,12 @@ def sha256(path):
 
 def fetch(url, path):
     path.parent.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(url, timeout=60) as r, open(path, "wb") as f:
+    req = urllib.request.Request(url)
+    token = os.environ.get("HF_TOKEN")
+    if token and urlparse(url).hostname == "huggingface.co":
+        # Unredirected: resolve URLs redirect to a CDN host, and urllib copies normal headers to the redirect target
+        req.add_unredirected_header("Authorization", f"Bearer {token}")
+    with urllib.request.urlopen(req, timeout=60) as r, open(path, "wb") as f:
         shutil.copyfileobj(r, f)
 
 
@@ -146,6 +160,8 @@ def freeze(source, raw_dir=RAW_DIR, manifest_path=MANIFEST):
         check(name, expected, sha256(target), target)
         print(f"{name}: {target} matches the manifest, skipping")
         return
+    if source.get("gated") and not os.environ.get("HF_TOKEN"):
+        raise SystemExit(f"{name} is gated: set HF_TOKEN to a Hugging Face token with access to {url}")
 
     # Download next to the target and rename only once it checks out, so a cut-off file never looks complete
     part = target.with_name(target.name + ".part")

@@ -47,3 +47,10 @@
   split: test
   unsafe: {any_of: [S, H, V, HR, SH, S3, H2, V2], equals: 1}
   label_fields: [S, H, V, HR, SH, S3, H2, V2]
+- name: wildguardtest
+  url: https://huggingface.co/datasets/allenai/wildguardmix/resolve/{revision}/test/wildguard_test.parquet
+  revision: d29c47f41c8b51348b5c8e8c81c039b3132b66d1
+  format: parquet
+  split: test
+  gated: true
+  # TODO unsafe and label_fields: the schema is unknown until the first download
