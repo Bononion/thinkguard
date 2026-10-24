@@ -21,7 +21,7 @@ SOURCES = Path("configs/data/sources.yaml")
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
 
-BENCHMARKS = ("toxicchat_0124_test", "openai_moderation")
+BENCHMARKS = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")
 BENCHMARK_NOTES = (
     "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
     (
@@ -31,6 +31,10 @@ BENCHMARK_NOTES = (
     (
         "- OpenAI Moderation: 925 rows lack a label for at least one category. Upstream says a missing label means"
         " unknown; we count it as not flagged, as safety-eval does. No row lacks all 8."
+    ),
+    (
+        "- WildGuardTest: gold label is response_harm_label (provisional; our models classify the agent turn, matching"
+        " safety-eval's wildguardtest_response task). prompt_harm_label is the alternative; final choice in #48."
     ),
 )
 

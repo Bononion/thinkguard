@@ -53,4 +53,5 @@
   format: parquet
   split: test
   gated: true
-  # TODO unsafe and label_fields: the schema is unknown until the first download
+  unsafe: {field: response_harm_label, equals: "harmful"}
+  label_fields: [prompt_harm_label, response_harm_label]

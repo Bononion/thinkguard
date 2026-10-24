@@ -265,5 +265,42 @@
     "split": "test",
     "unsafe_rows": 362,
     "url": "https://huggingface.co/datasets/lmsys/toxic-chat/resolve/29df8e4dba60e1f4af4b4075c0705c5b313548a8/data/0124/toxic-chat_annotation_test.csv"
+  },
+  "wildguardtest": {
+    "bytes": 2258878,
+    "downloaded_at": "2026-10-24T14:25:22+00:00",
+    "label_counts": {
+      "prompt_harm_label": {
+        "harmful": 754,
+        "null": 26,
+        "unharmful": 945
+      },
+      "response_harm_label": {
+        "harmful": 284,
+        "null": 16,
+        "unharmful": 1425
+      }
+    },
+    "revision": "d29c47f41c8b51348b5c8e8c81c039b3132b66d1",
+    "rows": 1725,
+    "schema": {
+      "row_keys": [
+        "adversarial",
+        "prompt",
+        "prompt_harm_agreement",
+        "prompt_harm_label",
+        "response",
+        "response_harm_agreement",
+        "response_harm_label",
+        "response_refusal_agreement",
+        "response_refusal_label",
+        "subcategory"
+      ],
+      "type": "parquet"
+    },
+    "sha256": "6ccc2909c1ae6d41424fac69f1fc32535b1de39cb8f80407d81e8bc64a0bebca",
+    "split": "test",
+    "unsafe_rows": 284,
+    "url": "https://huggingface.co/datasets/allenai/wildguardmix/resolve/d29c47f41c8b51348b5c8e8c81c039b3132b66d1/test/wildguard_test.parquet"
   }
 }
