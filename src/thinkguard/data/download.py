@@ -78,6 +78,11 @@ def unsafe_fields(rule):
     return rule["any_of"] if "any_of" in rule else [rule["field"]]
 
 
+def is_unsafe(row, rule):
+    """True if any of the rule's unsafe_fields equals its value; a missing field never matches."""
+    return any(row.get(f) == rule["equals"] for f in unsafe_fields(rule))
+
+
 def describe(source, rows):
     """Manifest fields computed from the rows: rows, schema, and unsafe_rows / dict_keys / label_counts if the
     source asks. A row is unsafe once if any of its unsafe_fields equals the rule's value.
@@ -87,8 +92,7 @@ def describe(source, rows):
         schema["row_keys"] = sorted(rows[0])
     info = {"rows": len(rows), "schema": schema}
     if "unsafe" in source:
-        rule = source["unsafe"]
-        info["unsafe_rows"] = sum(any(r.get(f) == rule["equals"] for f in unsafe_fields(rule)) for r in rows)
+        info["unsafe_rows"] = sum(is_unsafe(r, source["unsafe"]) for r in rows)
     if "label_fields" in source:
         # Keys are strings so the manifest stays valid sorted JSON; a missing field counts as null
         info["label_counts"] = {
