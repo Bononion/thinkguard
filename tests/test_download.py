@@ -81,9 +81,21 @@ def test_changed_source_fails(src):
 
 
 def test_unknown_format_raises(src):
-    with pytest.raises(ValueError, match="'csv'"):
-        run(src, fmt="csv")
+    with pytest.raises(ValueError, match="'not_a_format'"):
+        run(src, fmt="not_a_format")
     assert not TARGET.parent.exists()
+
+
+def test_unsafe_any_of_counts_a_row_once():
+    rows = [{"S": 1, "H": 0}, {"S": 1, "H": 1}, {"S": 0, "H": 0}]
+    info = download.describe({"format": "jsonl.gz", "unsafe": {"any_of": ["S", "H"], "equals": 1}}, rows)
+    assert info["unsafe_rows"] == 2
+
+
+def test_label_counts_count_null_and_missing_as_null():
+    rows = [{"t": 1}, {"t": None}, {}]
+    info = download.describe({"format": "jsonl.gz", "label_fields": ["t"]}, rows)
+    assert info["label_counts"] == {"t": {"1": 1, "null": 2}}
 
 
 def test_jsonl_gz_counts_unsafe_rows_and_dict_keys(src):
