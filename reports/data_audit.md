@@ -2,7 +2,7 @@
 
 ## Critique release
 
-Source: `data/raw/critique/beavertails_critiques_aug.json`, 15000 rows. Flagged rows: `reports/critique_flags.jsonl` (8 lines).
+Source: `https://raw.githubusercontent.com/luka-group/ThinkGuard/a7d0c8924a343009e9fd4b31aa84ac845b1ff454/data/beavertails_critiques_aug.json`, 15000 rows. Flagged rows: `reports/critique_flags.jsonl` (8 lines).
 
 Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.
 

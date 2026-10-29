@@ -1,8 +1,9 @@
 """Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
 
 Run from the repo root: python -m thinkguard.data.audit
-Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The report's
-Benchmarks section comes from data/raw_manifest.json and the unsafe rules in configs/data/sources.yaml.
+Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The critique and
+benchmark rows come from thinkguard.data.sources.load; the Benchmarks section counts them with the unsafe rules in
+configs/data/sources.yaml.
 Exits 1 if any row has a parse_error or an unknown category.
 """
 
@@ -13,11 +14,8 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 
-from thinkguard.data import download
+from thinkguard.data.sources import SOURCES, is_unsafe, load, load_sources, unsafe_fields, url
 
-CRITIQUE = Path("data/raw/critique/beavertails_critiques_aug.json")
-MANIFEST = Path("data/raw_manifest.json")
-SOURCES = Path("configs/data/sources.yaml")
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
 
@@ -56,10 +54,9 @@ CONTRADICTION = re.compile(
 )
 
 
-def load_keys(manifest=MANIFEST):
-    """The 14 BeaverTails category keys, as frozen from the 30k_test release."""
-    with open(manifest, encoding="utf-8") as f:
-        return json.load(f)["beavertails_30k_test"]["dict_keys"]["category"]
+def load_keys(path=SOURCES):
+    """The 14 BeaverTails category keys, as frozen from the 30k_test release into sources.yaml."""
+    return next(s for s in load_sources(path) if s["name"] == "beavertails_30k_test")["dict_keys"]["category"]
 
 
 def split_pieces(value):
@@ -184,8 +181,8 @@ def audit(rows, keys):
     return stats, flag_rows
 
 
-def render(stats, keys, n_flags):
-    """The "## Critique release" section of reports/data_audit.md."""
+def render(stats, keys, n_flags, source):
+    """The "## Critique release" section of reports/data_audit.md; source is the critique release's url."""
     s, cat, rw = stats["counts"], stats["categories"], stats["rows_with"]
 
     def rows_list(name):
@@ -199,7 +196,7 @@ def render(stats, keys, n_flags):
     lines = [
         "## Critique release",
         "",
-        f"Source: `{CRITIQUE.as_posix()}`, {stats['rows']} rows. Flagged rows: `{FLAGS.as_posix()}` ({n_flags} lines).",
+        f"Source: `{source}`, {stats['rows']} rows. Flagged rows: `{FLAGS.as_posix()}` ({n_flags} lines).",
         "",
         "Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.",
         "",
@@ -232,8 +229,10 @@ def render(stats, keys, n_flags):
     return "\n".join(lines) + "\n"
 
 
-def render_benchmarks(manifest, sources):
-    """The "## Benchmarks" section. Missing label cells: total null count in label_counts over the gold-label fields."""
+def render_benchmarks(rows, sources):
+    """The "## Benchmarks" section, counted from each benchmark's rows. Missing label cells: null or missing
+    gold-label values, summed over the gold-label fields.
+    """
     lines = [
         "## Benchmarks",
         "",
@@ -241,10 +240,12 @@ def render_benchmarks(manifest, sources):
         "|---|---|---|---|---|",
     ]
     for name in BENCHMARKS:
-        entry, fields = manifest[name], download.unsafe_fields(sources[name]["unsafe"])
-        missing = sum(entry["label_counts"][f].get("null", 0) for f in fields)
+        rule = sources[name]["unsafe"]
+        fields = unsafe_fields(rule)
+        positives = sum(is_unsafe(r, rule) for r in rows[name])
+        missing = sum(r.get(f) is None for r in rows[name] for f in fields)
         gold = ", ".join(f"`{f}`" for f in fields)
-        lines.append(f"| `{name}` | {gold} | {entry['rows']} | {entry['unsafe_rows']} | {missing} |")
+        lines.append(f"| `{name}` | {gold} | {len(rows[name])} | {positives} | {missing} |")
     return "\n".join([*lines, "", *BENCHMARK_NOTES]) + "\n"
 
 
@@ -257,13 +258,11 @@ def write(text, flags, report=REPORT, flags_path=FLAGS):
 
 
 def main():
-    with open(CRITIQUE, encoding="utf-8") as f:
-        rows = json.load(f)
+    sources = {s["name"]: s for s in load_sources()}
     keys = load_keys()
-    stats, flags = audit(rows, keys)
-    sources = {s["name"]: s for s in download.load_sources(SOURCES)}
-    benchmarks = render_benchmarks(download.load_manifest(MANIFEST), sources)
-    text = "# Data audit\n\n" + render(stats, keys, len(flags)) + "\n" + benchmarks
+    stats, flags = audit(load("critique"), keys)
+    benchmarks = render_benchmarks({name: load(name) for name in BENCHMARKS}, sources)
+    text = "# Data audit\n\n" + render(stats, keys, len(flags), url(sources["critique"])) + "\n" + benchmarks
     write(text, flags)
     print(text)
     parse_errors = sum(r["reason"] == "parse_error" for r in flags)

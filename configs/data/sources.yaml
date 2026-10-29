@@ -1,57 +1,81 @@
-# Raw data sources frozen by `python -m thinkguard.data.download --config configs/data/sources.yaml`.
-# {revision} in url is filled from revision.
+# Data sources, loaded at the pinned revision by thinkguard.data.sources.load (datasets.load_dataset).
+# {revision} in url is filled from revision. Every load checks rows and unsafe_rows.
 - name: critique
   url: https://raw.githubusercontent.com/luka-group/ThinkGuard/{revision}/data/beavertails_critiques_aug.json
   revision: a7d0c8924a343009e9fd4b31aa84ac845b1ff454
   format: json  # a top-level JSON array
   split: train
+  rows: 15000
 - name: beavertails_30k_test
   url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/30k/test.jsonl.gz
   revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
   format: jsonl.gz
   split: test
   unsafe: {field: is_safe, equals: false}
-  dict_keys: category
+  rows: 3021
+  unsafe_rows: 1733
+  dict_keys:  # the same 14 category keys in every BeaverTails split
+    category:
+      - animal_abuse
+      - child_abuse
+      - controversial_topics,politics
+      - discrimination,stereotype,injustice
+      - drug_abuse,weapons,banned_substance
+      - financial_crime,property_crime,theft
+      - hate_speech,offensive_language
+      - misinformation_regarding_ethics,laws_and_safety
+      - non_violent_unethical_behavior
+      - privacy_violation
+      - self_harm
+      - sexually_explicit,adult_content
+      - terrorism,organized_crime
+      - violence,aiding_and_abetting,incitement
 - name: beavertails_30k_train
   url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/30k/train.jsonl.gz
   revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
   format: jsonl.gz
   split: train
   unsafe: {field: is_safe, equals: false}
-  dict_keys: category
+  rows: 27186
+  unsafe_rows: 15582
 - name: beavertails_330k_train
   url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/330k/train.jsonl.xz
   revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
   format: jsonl.xz
   split: train
   unsafe: {field: is_safe, equals: false}
-  dict_keys: category
+  rows: 300567
+  unsafe_rows: 166382
 - name: beavertails_330k_test
   url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/330k/test.jsonl.xz
   revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
   format: jsonl.xz
   split: test
   unsafe: {field: is_safe, equals: false}
-  dict_keys: category
+  rows: 33396
+  unsafe_rows: 18689
 - name: toxicchat_0124_test
   url: https://huggingface.co/datasets/lmsys/toxic-chat/resolve/{revision}/data/0124/toxic-chat_annotation_test.csv
   revision: 29df8e4dba60e1f4af4b4075c0705c5b313548a8
   format: csv
   split: test
-  unsafe: {field: toxicity, equals: "1"}  # CSV values are strings
-  label_fields: [toxicity, jailbreaking, human_annotation]
+  unsafe: {field: toxicity, equals: 1}  # datasets reads this CSV column as int
+  rows: 5083
+  unsafe_rows: 362
 - name: openai_moderation
   url: https://raw.githubusercontent.com/openai/moderation-api-release/{revision}/data/samples-1680.jsonl.gz
   revision: f4ab51b5edd3bfbcb349a56324274235b674e0e4
   format: jsonl.gz
   split: test
   unsafe: {any_of: [S, H, V, HR, SH, S3, H2, V2], equals: 1}
-  label_fields: [S, H, V, HR, SH, S3, H2, V2]
+  rows: 1680
+  unsafe_rows: 522
 - name: wildguardtest
   url: https://huggingface.co/datasets/allenai/wildguardmix/resolve/{revision}/test/wildguard_test.parquet
   revision: d29c47f41c8b51348b5c8e8c81c039b3132b66d1
   format: parquet
   split: test
-  gated: true
+  gated: true  # needs a Hugging Face login (hf auth login or HF_TOKEN) with access granted
   unsafe: {field: response_harm_label, equals: "harmful"}
-  label_fields: [prompt_harm_label, response_harm_label]
+  rows: 1725
+  unsafe_rows: 284
