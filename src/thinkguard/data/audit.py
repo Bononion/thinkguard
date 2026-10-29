@@ -1,9 +1,11 @@
 """Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
 
 Run from the repo root: python -m thinkguard.data.audit
+Run order: normalize, filter_train, audit (each as python -m thinkguard.data.<name>).
 Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The critique and
 benchmark rows come from thinkguard.data.sources.load; the Benchmarks section counts them with the unsafe rules in
-configs/data/sources.yaml.
+configs/data/sources.yaml. The Training filter section counts data/interim/critique_filtered.jsonl and
+reports/label_conflicts.jsonl (written by filter_train).
 Exits 1 if any row has a parse_error or an unknown category.
 """
 
@@ -18,6 +20,10 @@ from thinkguard.data.sources import SOURCES, is_unsafe, load, load_sources, unsa
 
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
+TRAIN_FILTERED = Path("data/interim/critique_filtered.jsonl")
+LABEL_CONFLICTS = Path("reports/label_conflicts.jsonl")
+EXCLUSION_REASONS = ("duplicate", "duplicate_conflict", "teacher_human_conflict")  # protocol.md order: first match wins
+CONFLICT_TYPES = ("teacher_teacher", "teacher_human")
 
 BENCHMARKS = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")
 BENCHMARK_NOTES = (
@@ -229,6 +235,26 @@ def render(stats, keys, n_flags, source):
     return "\n".join(lines) + "\n"
 
 
+def render_train_filter(rows, conflicts):
+    """The "## Training filter" section: rows from critique_filtered.jsonl, conflicts from label_conflicts.jsonl."""
+    reasons = Counter(r["exclusion_reason"] for r in rows)
+    types = Counter(c["type"] for c in conflicts)
+    groups = [n for n in Counter(r["pair_hash"] for r in rows).values() if n > 1]
+    lines = [
+        "## Training filter",
+        "",
+        (
+            f"Source: `{TRAIN_FILTERED.as_posix()}`, {len(rows)} rows; {reasons[None]} kept."
+            f" Rules: `protocol.md`, Training data filtering. Conflicts: `{LABEL_CONFLICTS.as_posix()}`."
+        ),
+        "",
+        f"- Duplicates (same pair_hash): {len(groups)} groups ({sum(groups)} rows)",
+        f"- Conflicts: {', '.join(f'{t} {types[t]}' for t in CONFLICT_TYPES)}",
+        f"- Exclusions by reason: {', '.join(f'{r} {reasons[r]}' for r in EXCLUSION_REASONS)}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def render_benchmarks(rows, sources):
     """The "## Benchmarks" section, counted from each benchmark's rows. Missing label cells: null or missing
     gold-label values, summed over the gold-label fields.
@@ -262,7 +288,12 @@ def main():
     keys = load_keys()
     stats, flags = audit(load("critique"), keys)
     benchmarks = render_benchmarks({name: load(name) for name in BENCHMARKS}, sources)
-    text = "# Data audit\n\n" + render(stats, keys, len(flags), url(sources["critique"])) + "\n" + benchmarks
+    with open(TRAIN_FILTERED, encoding="utf-8") as f:
+        filtered = [json.loads(line) for line in f]
+    with open(LABEL_CONFLICTS, encoding="utf-8") as f:
+        train_filter = render_train_filter(filtered, [json.loads(line) for line in f])
+    critique = render(stats, keys, len(flags), url(sources["critique"]))
+    text = "# Data audit\n\n" + critique + "\n" + train_filter + "\n" + benchmarks
     write(text, flags)
     print(text)
     parse_errors = sum(r["reason"] == "parse_error" for r in flags)

@@ -18,6 +18,14 @@ Label source: per the ThinkGuard paper, the critics were given the gold BeaverTa
 - Contradictions (explanation gives a direct verdict for the other label): 2 (rows 2561, 14857)
 - Duplicates: 18 inputs appear more than once (36 rows); 1 pair(s) with different labels: rows 4774 and 5475
 
+## Training filter
+
+Source: `data/interim/critique_filtered.jsonl`, 15000 rows; 14980 kept. Rules: `protocol.md`, Training data filtering. Conflicts: `reports/label_conflicts.jsonl`.
+
+- Duplicates (same pair_hash): 18 groups (36 rows)
+- Conflicts: teacher_teacher 2, teacher_human 0
+- Exclusions by reason: duplicate 16, duplicate_conflict 4, teacher_human_conflict 0
+
 ## Benchmarks
 
 | Benchmark | Gold-label field(s) | Rows | Positives | Missing label cells |
