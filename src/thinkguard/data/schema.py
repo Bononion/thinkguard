@@ -42,3 +42,9 @@ class Example:
             if d[f] is not None:
                 d[f] = tuple(d[f])
         return cls(**d)
+
+
+def read_examples(path):
+    """The Examples of a JSON-lines file, one per line, in file order."""
+    with open(path, encoding="utf-8") as f:
+        return [Example.from_json(line) for line in f]

@@ -36,6 +36,31 @@ Test overlap: critique rows whose pair_hash / prompt_hash matches a test row's, 
 | `openai_moderation` | 1680 | n/a | 0 -> 0 | 0 (1680 unseen) |
 | `wildguardtest` | 1725 | 0 -> 0 | 0 -> 0 | 0 (1725 unseen) |
 
+## Validation split
+
+Source: the 14974 kept rows of `data/interim/critique_filtered.jsonl`. Rules: `protocol.md`, Validation split.
+
+- Seed: 2. Rejected (a category under 5 validation rows): seed 0 (child_abuse 1, self_harm 2); seed 1 (child_abuse 2, terrorism,organized_crime 2)
+- Train: 14224 rows, 6645 prompt groups; unsafe 8060, safe 6164
+- Validation: 750 rows, 363 prompt groups; unsafe 452, safe 298
+
+| Category | Train | Validation |
+|---|---|---|
+| `animal_abuse` | 208 | 8 |
+| `child_abuse` | 93 | 5 |
+| `controversial_topics,politics` | 493 | 25 |
+| `discrimination,stereotype,injustice` | 1222 | 44 |
+| `drug_abuse,weapons,banned_substance` | 806 | 49 |
+| `financial_crime,property_crime,theft` | 1308 | 83 |
+| `hate_speech,offensive_language` | 1288 | 67 |
+| `misinformation_regarding_ethics,laws_and_safety` | 349 | 14 |
+| `non_violent_unethical_behavior` | 2461 | 132 |
+| `privacy_violation` | 718 | 35 |
+| `self_harm` | 116 | 6 |
+| `sexually_explicit,adult_content` | 350 | 15 |
+| `terrorism,organized_crime` | 151 | 5 |
+| `violence,aiding_and_abetting,incitement` | 3565 | 223 |
+
 ## Benchmarks
 
 | Benchmark | Gold-label field(s) | Rows | Positives | Missing label cells |
