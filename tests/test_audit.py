@@ -1,14 +1,15 @@
-"""thinkguard.data.audit: unit tests run in CI; the data test needs the downloaded critique file."""
+"""thinkguard.data.audit: unit tests run in CI; the data test loads the critique release, so CI skips it."""
 
-import json
+import os
 from pathlib import Path
 
 import pytest
 
 from thinkguard.data import audit
+from thinkguard.data.sources import SOURCES, load
 
 ROOT = Path(__file__).parents[1]
-KEYS = audit.load_keys(ROOT / audit.MANIFEST)
+KEYS = audit.load_keys(ROOT / SOURCES)
 
 
 def test_regroup_takes_the_longest_key():
@@ -26,10 +27,9 @@ def test_contradiction_regex():
     assert audit.CONTRADICTION.search("This could be considered unsafe") is None
 
 
-@pytest.mark.skipif(not (ROOT / audit.CRITIQUE).exists(), reason="critique file not downloaded")
+@pytest.mark.skipif(os.environ.get("CI") == "true", reason="loads the critique release over the network")
 def test_critique_release():
-    with open(ROOT / audit.CRITIQUE, encoding="utf-8") as f:
-        stats, _ = audit.audit(json.load(f), KEYS)
+    stats, _ = audit.audit(load("critique", ROOT / SOURCES), KEYS)
     s, cat = stats["counts"], stats["categories"]
     assert stats["rows"] == 15000
     assert (s["unsafe"], s["safe"]) == (8526, 6474)

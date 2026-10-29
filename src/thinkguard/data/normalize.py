@@ -1,11 +1,11 @@
 """Normalize every source into Example rows, one JSON line each in data/interim/<source>.jsonl.
 
-Run from the repo root, after the download: python -m thinkguard.data.normalize
+Run from the repo root: python -m thinkguard.data.normalize
 Rows that fail to parse are dropped and counted by parse_status. Benchmark gold labels follow each source's unsafe
 rule in configs/data/sources.yaml. Critique rows take their teacher label from the critique and their gold label
 from the beavertails_30k_train annotations of the same pair; neither is ever filled from the other.
 Output keeps raw row order and has no timestamps, so a rerun is byte-identical.
-Exits 1 if a benchmark's gold unsafe count differs from the manifest's unsafe_rows.
+Exits 1 if a benchmark's gold unsafe count differs from its unsafe_rows in sources.yaml.
 """
 
 import sys
@@ -13,9 +13,10 @@ from collections import Counter, defaultdict
 from functools import partial
 from pathlib import Path
 
-from thinkguard.data import audit, download, match
+from thinkguard.data import audit
 from thinkguard.data.keys import pair_hash, prompt_hash
 from thinkguard.data.schema import Example
+from thinkguard.data.sources import is_unsafe, load, load_sources, unsafe_fields
 
 GOLD_SPLIT = "beavertails_30k_train"  # the critique release's source split (#42)
 INTERIM = Path("data/interim")
@@ -28,9 +29,9 @@ def missing_text(row, fields):
 
 def gold_label(row, rule):
     """Gold "unsafe" / "safe" by a source's unsafe rule, or None if every field of the rule is missing or null."""
-    if all(row.get(f) is None for f in download.unsafe_fields(rule)):
+    if all(row.get(f) is None for f in unsafe_fields(rule)):
         return None
-    return "unsafe" if download.is_unsafe(row, rule) else "safe"
+    return "unsafe" if is_unsafe(row, rule) else "safe"
 
 
 def true_keys(flags):
@@ -64,14 +65,14 @@ def beavertails(row, rule):
 def toxicchat(row, rule):
     if reason := missing_text(row, ("user_input",)):
         return reason
-    status = "human" if row["human_annotation"] == "True" else "auto"
+    status = "human" if row["human_annotation"] else "auto"  # datasets reads the CSV's True/False as bool
     return benchmark(row["user_input"], None, gold_label(row, rule), (), status)
 
 
 def openai_moderation(row, rule):
     if reason := missing_text(row, ("prompt",)):
         return reason
-    flagged = tuple(sorted(f for f in download.unsafe_fields(rule) if row.get(f) == rule["equals"]))
+    flagged = tuple(sorted(f for f in unsafe_fields(rule) if row.get(f) == rule["equals"]))
     return benchmark(row["prompt"], None, gold_label(row, rule), flagged, "human")
 
 
@@ -169,15 +170,14 @@ def counts(counter):
 
 
 def main():
-    sources = {s["name"]: s for s in download.load_sources(audit.SOURCES)}
-    manifest = download.load_manifest(download.MANIFEST)
-    gold = gold_annotations(match.read_split(GOLD_SPLIT, manifest), sources[GOLD_SPLIT]["unsafe"])
+    sources = {s["name"]: s for s in load_sources()}
+    gold = gold_annotations(load(GOLD_SPLIT), sources[GOLD_SPLIT]["unsafe"])
     to_fields = {name: partial(fn, rule=sources[name]["unsafe"]) for name, fn in BENCHMARKS.items()}
     to_fields["critique"] = partial(critique, keys=audit.load_keys(), gold=gold)
 
     mismatches = []
     for name in SOURCES:
-        rows = match.read_split(name, manifest)
+        rows = load(name)
         examples, status = normalize(name, sources[name], rows, to_fields[name])
         write(examples, INTERIM / f"{name}.jsonl")
         dropped = Counter({k: n for k, n in status.items() if k != "ok"})
@@ -186,10 +186,10 @@ def main():
             f"{name}: {len(rows)} raw, {len(examples)} written, {dropped.total()} dropped ({counts(dropped)});"
             f" gold unsafe {unsafe}; annotation_status {counts(Counter(e.annotation_status for e in examples))}"
         )
-        if name in BENCHMARKS and unsafe != manifest[name]["unsafe_rows"]:
-            mismatches.append(f"{name} {unsafe} != {manifest[name]['unsafe_rows']}")
+        if name in BENCHMARKS and unsafe != sources[name]["unsafe_rows"]:
+            mismatches.append(f"{name} {unsafe} != {sources[name]['unsafe_rows']}")
     if mismatches:
-        sys.exit(f"FAIL: gold unsafe count differs from the manifest's unsafe_rows: {'; '.join(mismatches)}")
+        sys.exit(f"FAIL: gold unsafe count differs from sources.yaml's unsafe_rows: {'; '.join(mismatches)}")
 
 
 if __name__ == "__main__":

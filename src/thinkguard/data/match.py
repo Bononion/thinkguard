@@ -1,26 +1,20 @@
 """Find which BeaverTails split the critique release came from, by matching its conversations on pair_hash.
 
-Run from the repo root, after the download and a passing audit: python -m thinkguard.data.match
+Run from the repo root, after a passing audit: python -m thinkguard.data.match
 Report only; no labels change. Writes reports/source_match.md: per-split match counts, the source split, the
 critique rows whose pair has conflicting human is_safe annotations there, and the rows not found in it.
 Exits 1 unless exactly one split contains every critique row.
 """
 
-import json
 from collections import defaultdict
 from pathlib import Path
 
-from thinkguard.data import audit, download
+from thinkguard.data import audit
 from thinkguard.data.keys import pair_hash
+from thinkguard.data.sources import load
 
 SPLITS = ("beavertails_30k_train", "beavertails_30k_test", "beavertails_330k_train", "beavertails_330k_test")
 REPORT = Path("reports/source_match.md")
-
-
-def read_split(name, manifest):
-    path = download.target_path(name, manifest[name]["url"])
-    reader, _ = download.READERS[path.name.split(".", 1)[1]]  # format = the file's extensions, e.g. jsonl.xz
-    return reader(path)
 
 
 def index(rows):
@@ -116,12 +110,9 @@ def render(stats, n_rows):
 
 
 def main():
-    with open(audit.CRITIQUE, encoding="utf-8") as f:
-        crit = json.load(f)
-    with open(download.MANIFEST, encoding="utf-8") as f:
-        manifest = json.load(f)
+    crit = load("critique")
     hashes = critique_hashes(crit)
-    stats = match(hashes, {name: index(read_split(name, manifest)) for name in SPLITS})
+    stats = match(hashes, {name: index(load(name)) for name in SPLITS})
 
     text = render(stats, len(crit))
     REPORT.parent.mkdir(parents=True, exist_ok=True)
