@@ -1,4 +1,4 @@
-"""Filter the critique rows for training: exact duplicates and label conflicts, by the rules in protocol.md.
+"""Filter the critique rows for training (exact duplicates, label conflicts, test overlap) by the rules in protocol.md.
 
 Run from the repo root, after normalize: python -m thinkguard.data.filter_train
 Writes data/interim/critique_filtered.jsonl (every row in raw order, exclusion_reason set on the excluded ones) and
@@ -11,10 +11,22 @@ from collections import Counter, defaultdict
 from dataclasses import replace
 
 from thinkguard.data import audit
-from thinkguard.data.normalize import INTERIM, counts, write
+from thinkguard.data.normalize import BENCHMARKS, INTERIM, counts, write
 from thinkguard.data.schema import Example
 
 CRITIQUE = INTERIM / "critique.jsonl"
+TEST_KEY = {"prompt_response": "pair_hash", "prompt_only": "prompt_hash"}  # a test row's key, by its task_type
+
+
+def read(path):
+    with open(path, encoding="utf-8") as f:
+        return [Example.from_json(line) for line in f]
+
+
+def test_key(t):
+    """A test row's key as (field, hash): its pair_hash or prompt_hash, by its own task_type."""
+    field = TEST_KEY[t.task_type]
+    return field, getattr(t, field)
 
 
 def targets(e):
@@ -31,8 +43,10 @@ def conflict(kind, rows, gold=False):
     }
 
 
-def filter_rows(examples):
-    """(examples with exclusion_reason set, conflict lines), by the protocol.md rules."""
+def filter_rows(examples, tests):
+    """(examples with exclusion_reason set, conflict lines), by the protocol.md rules. tests maps each test set, in
+    normalize.BENCHMARKS order, to its rows.
+    """
     groups = defaultdict(list)
     for e in examples:
         groups[e.pair_hash].append(e)
@@ -53,14 +67,21 @@ def filter_rows(examples):
         if (e.gold_safety_label, e.gold_categories) != targets(e):
             conflicts.append(conflict("teacher_human", [e], gold=True))
             reason[e.raw_record_id] = "teacher_human_conflict"
-    filtered = [replace(e, exclusion_reason=reason.get(e.raw_record_id)) for e in examples]
+    test_keys = {name: {test_key(t) for t in rows} for name, rows in tests.items()}
+    for e in examples:
+        if e.raw_record_id in reason:
+            continue
+        keys = {(f, getattr(e, f)) for f in TEST_KEY.values()}
+        overlap = next((name for name, k in test_keys.items() if keys & k), None)
+        if overlap:
+            reason[e.raw_record_id] = f"test_overlap_{overlap}"
+    filtered =[replace(e, exclusion_reason=reason.get(e.raw_record_id)) for e in examples]
     return filtered, conflicts
 
 
 def main():
-    with open(CRITIQUE, encoding="utf-8") as f:
-        examples = [Example.from_json(line) for line in f]
-    filtered, conflicts = filter_rows(examples)
+    examples = read(CRITIQUE)
+    filtered, conflicts = filter_rows(examples, {name: read(INTERIM / f"{name}.jsonl") for name in BENCHMARKS})
     write(filtered, audit.TRAIN_FILTERED)
     audit.LABEL_CONFLICTS.parent.mkdir(parents=True, exist_ok=True)
     with open(audit.LABEL_CONFLICTS, "w", encoding="utf-8", newline="\n") as f:

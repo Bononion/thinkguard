@@ -16,7 +16,7 @@ from pathlib import Path
 from thinkguard.data import audit
 from thinkguard.data.keys import pair_hash, prompt_hash
 from thinkguard.data.schema import Example
-from thinkguard.data.sources import is_unsafe, load, load_sources, unsafe_fields
+from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields
 
 GOLD_SPLIT = "beavertails_30k_train"  # the critique release's source split (#42)
 INTERIM = Path("data/interim")
@@ -123,12 +123,13 @@ def critique(row, keys, gold):
     }
 
 
-BENCHMARKS = {
+NORMALIZERS = {
     "beavertails_30k_test": beavertails,
     "toxicchat_0124_test": toxicchat,
     "openai_moderation": openai_moderation,
     "wildguardtest": wildguardtest,
 }
+BENCHMARKS = {name: NORMALIZERS[name] for name in TEST_SETS}  # KeyError if a test set has no normalizer
 SOURCES = ("critique", *BENCHMARKS)
 
 

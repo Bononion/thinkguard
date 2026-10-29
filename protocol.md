@@ -16,4 +16,13 @@ to `reports/label_conflicts.jsonl`.
 - Teacher vs human: a row whose `gold_safety_label` is not null and whose gold label or gold categories differ from its
   teacher label or categories gets `exclusion_reason` `"teacher_human_conflict"`. Rows with a null gold label are
   kept: we train on the teacher label.
+- Test overlap: a row still kept after the rules above that shares a key with a row of a test set gets
+  `exclusion_reason` `"test_overlap_<set>"`. The test sets are the four benchmarks in `sources.TEST_SETS`, read from
+  `data/interim/<set>.jsonl`. A test row's key follows its `task_type`: `pair_hash` for `prompt_response` rows
+  (`beavertails_30k_test`, `wildguardtest`), `prompt_hash` for `prompt_only` rows (`toxicchat_0124_test`,
+  `openai_moderation`). A row that matches several sets takes the first set in `sources.TEST_SETS` order.
+- Same prompt with a different response is not excluded for `prompt_response` sets: the model labels the response,
+  and BeaverTails reuses each prompt with many responses by design, so excluding it would drop about 30% of training
+  rows. The count is reported instead (`reports/data_audit.md`, Training filter), so the test rows whose prompt never
+  appears in training can be scored separately.
 - One reason per row: the rules are checked in the order above and the first match wins.
