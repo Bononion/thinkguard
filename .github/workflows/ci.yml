@@ -16,3 +16,4 @@ jobs:
       - run: pip install -e . ruff==0.17.1 pytest
       - run: ruff check
       - run: pytest -m "not gpu"
+      - run: python -m thinkguard.data.verify_readme --committed-only
