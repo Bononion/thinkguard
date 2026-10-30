@@ -47,3 +47,5 @@ training). `thinkguard.data.split` applies these rules; `python -m thinkguard.da
   broken by `example_id`; they count toward its unsafe / safe totals.
 - The other rows are drawn per label with `random.Random(0).sample` (a new generator for each label) from that label's
   remaining train rows sorted by `example_id`.
+- Each test set's manifest lists every row of its interim file, including rows with no gold label; which rows are
+  scored is decided in #48.
