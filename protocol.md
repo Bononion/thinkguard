@@ -40,3 +40,10 @@ training). `thinkguard.data.split` applies these rules; `python -m thinkguard.da
 - Seed rule: try seed 0, 1, 2, ... and use the first seed where every BeaverTails category (`teacher_categories`) has
   at least 5 validation rows; if no seed below 100 passes, the split fails. The seeds tried and why they failed are
   logged in `reports/data_audit.md`.
+- Smoke (32 rows) and pilot (1000 rows) subsets are drawn only from the train side of the validation split.
+- Both keep train's unsafe ratio: `n_unsafe = round(size * unsafe / rows)`, with `unsafe` and `rows` counted over
+  train; the rest are safe.
+- The pilot includes the 20 longest train rows by `len(user_prompt) + len(assistant_response) + len(critique)`, ties
+  broken by `example_id`; they count toward its unsafe / safe totals.
+- The other rows are drawn per label with `random.Random(0).sample` (a new generator for each label) from that label's
+  remaining train rows sorted by `example_id`.
