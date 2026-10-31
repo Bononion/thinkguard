@@ -6,6 +6,7 @@ Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flag
 benchmark rows come from thinkguard.data.sources.load; the Benchmarks section counts them with the unsafe rules in
 configs/data/sources.yaml. The Training filter section counts data/interim/critique_filtered.jsonl and
 reports/label_conflicts.jsonl (written by filter_train), and the test sets' data/interim/<name>.jsonl (by normalize).
+The Validation split section splits the kept rows of critique_filtered.jsonl with thinkguard.data.split.
 Exits 1 if any row has a parse_error or an unknown category.
 """
 
@@ -16,7 +17,9 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 
+from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import SOURCES, TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
+from thinkguard.data.split import MIN_PER_CATEGORY, choose_seed, group_split
 
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
@@ -241,26 +244,26 @@ def render(stats, keys, n_flags, source):
 
 
 def render_train_filter(rows, conflicts, tests):
-    """The "## Training filter" section: rows from critique_filtered.jsonl, conflicts from label_conflicts.jsonl, tests
-    each test set's rows from data/interim/<name>.jsonl. Before -> after the test-overlap rule: the rows whose
-    exclusion_reason is null or test_overlap_* -> null.
+    """The "## Training filter" section: rows are the Examples of critique_filtered.jsonl, conflicts the lines of
+    label_conflicts.jsonl, tests each test set's Examples from data/interim/<name>.jsonl. Before -> after the
+    test-overlap rule: the rows whose exclusion_reason is null or test_overlap_* -> null.
     """
-    reasons = Counter(r["exclusion_reason"] for r in rows)
+    reasons = Counter(r.exclusion_reason for r in rows)
     types = Counter(c["type"] for c in conflicts)
-    groups = [n for n in Counter(r["pair_hash"] for r in rows).values() if n > 1]
-    before = [r for r in rows if r["exclusion_reason"] is None or r["exclusion_reason"].startswith("test_overlap_")]
-    after = [r for r in rows if r["exclusion_reason"] is None]
-    label_before, label_after = (Counter(r["teacher_safety_label"] for r in part) for part in (before, after))
-    trained_prompts = {r["prompt_hash"] for r in after}
+    groups = [n for n in Counter(r.pair_hash for r in rows).values() if n > 1]
+    before = [r for r in rows if r.exclusion_reason is None or r.exclusion_reason.startswith("test_overlap_")]
+    after = [r for r in rows if r.exclusion_reason is None]
+    label_before, label_after = (Counter(r.teacher_safety_label for r in part) for part in (before, after))
+    trained_prompts = {r.prompt_hash for r in after}
 
     def overlap(key, test):
-        values = {t[key] for t in test}
-        return " -> ".join(str(sum(r[key] in values for r in part)) for part in (before, after))
+        values = {getattr(t, key) for t in test}
+        return " -> ".join(str(sum(getattr(r, key) in values for r in part)) for part in (before, after))
 
     table = []
     for name, test in tests.items():
-        pair = "n/a" if all(t["task_type"] == "prompt_only" for t in test) else overlap("pair_hash", test)
-        seen = sum(t["prompt_hash"] in trained_prompts for t in test)
+        pair = "n/a" if all(t.task_type == "prompt_only" for t in test) else overlap("pair_hash", test)
+        seen = sum(t.prompt_hash in trained_prompts for t in test)
         table.append(
             f"| `{name}` | {len(test)} | {pair} | {overlap('prompt_hash', test)} | {seen} ({len(test) - seen} unseen) |"
         )
@@ -291,6 +294,35 @@ def render_train_filter(rows, conflicts, tests):
         "|---|---|---|---|---|",
         *table,
     ]
+    return "\n".join(lines) + "\n"
+
+
+def render_split(examples, keys):
+    """The "## Validation split" section: examples are the kept rows of critique_filtered.jsonl, split with the seed
+    choose_seed picks; keys order the category table.
+    """
+    seed, failures = choose_seed(examples)
+    sides = dict(zip(("Train", "Validation"), group_split(examples, seed=seed)))
+    rejected = "; ".join(f"seed {s} ({', '.join(f'{c} {n}' for c, n in low.items())})" for s, low in failures.items())
+    lines = [
+        "## Validation split",
+        "",
+        (
+            f"Source: the {len(examples)} kept rows of `{TRAIN_FILTERED.as_posix()}`."
+            " Rules: `protocol.md`, Validation split."
+        ),
+        "",
+        f"- Seed: {seed}. Rejected (a category under {MIN_PER_CATEGORY} validation rows): {rejected or 'none'}",
+    ]
+    for side, rows in sides.items():
+        labels = Counter(e.teacher_safety_label for e in rows)
+        lines.append(
+            f"- {side}: {len(rows)} rows, {len({e.prompt_hash for e in rows})} prompt groups;"
+            f" unsafe {labels['unsafe']}, safe {labels['safe']}"
+        )
+    cats = {side: Counter(c for e in rows for c in e.teacher_categories) for side, rows in sides.items()}
+    lines += ["", "| Category | Train | Validation |", "|---|---|---|"]
+    lines += [f"| `{k}` | {cats['Train'][k]} | {cats['Validation'][k]} |" for k in keys]
     return "\n".join(lines) + "\n"
 
 
@@ -332,10 +364,12 @@ def main():
     keys = load_keys()
     stats, flags = audit(load("critique"), keys)
     benchmarks = render_benchmarks({name: load(name) for name in BENCHMARKS}, sources)
-    tests = {name: read_jsonl(TRAIN_FILTERED.parent / f"{name}.jsonl") for name in TEST_SETS}
-    train_filter = render_train_filter(read_jsonl(TRAIN_FILTERED), read_jsonl(LABEL_CONFLICTS), tests)
+    filtered = read_examples(TRAIN_FILTERED)
+    tests = {name: read_examples(TRAIN_FILTERED.parent / f"{name}.jsonl") for name in TEST_SETS}
+    train_filter = render_train_filter(filtered, read_jsonl(LABEL_CONFLICTS), tests)
+    kept = [e for e in filtered if e.exclusion_reason is None]
     critique = render(stats, keys, len(flags), url(sources["critique"]))
-    text = "# Data audit\n\n" + critique + "\n" + train_filter + "\n" + benchmarks
+    text = "# Data audit\n\n" + "\n".join((critique, train_filter, render_split(kept, keys), benchmarks))
     write(text, flags)
     print(text)
     parse_errors = sum(r["reason"] == "parse_error" for r in flags)

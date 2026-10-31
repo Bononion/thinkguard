@@ -26,3 +26,26 @@ to `reports/label_conflicts.jsonl`.
   rows. The count is reported instead (`reports/data_audit.md`, Training filter), so the test rows whose prompt never
   appears in training can be scored separately.
 - One reason per row: the rules are checked in the order above and the first match wins.
+
+## Validation split
+
+Applies to the rows of `data/interim/critique_filtered.jsonl` whose `exclusion_reason` is null (the rows kept for
+training). `thinkguard.data.split` applies these rules; `python -m thinkguard.data.audit` reports the result in
+`reports/data_audit.md`, Validation split.
+
+- Validation is about 5% of the kept training rows, grouped by `prompt_hash`: every row with the same prompt goes to
+  the same side, so no prompt appears in both.
+- Split: sort the distinct `prompt_hash` values, shuffle them with `random.Random(seed)`, and move whole groups to
+  validation in that order until it has at least 5% of the rows. The rest is train.
+- Seed rule: try seed 0, 1, 2, ... and use the first seed where every BeaverTails category (`teacher_categories`) has
+  at least 5 validation rows; if no seed below 100 passes, the split fails. The seeds tried and why they failed are
+  logged in `reports/data_audit.md`.
+- Smoke (32 rows) and pilot (1000 rows) subsets are drawn only from the train side of the validation split.
+- Both keep train's unsafe ratio: `n_unsafe = round(size * unsafe / rows)`, with `unsafe` and `rows` counted over
+  train; the rest are safe.
+- The pilot includes the 20 longest train rows by `len(user_prompt) + len(assistant_response) + len(critique)`, ties
+  broken by `example_id`; they count toward its unsafe / safe totals.
+- The other rows are drawn per label with `random.Random(0).sample` (a new generator for each label) from that label's
+  remaining train rows sorted by `example_id`.
+- Each test set's manifest lists every row of its interim file, including rows with no gold label; which rows are
+  scored is decided in #48.
