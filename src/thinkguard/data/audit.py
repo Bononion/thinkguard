@@ -1,9 +1,11 @@
 """Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
 
 Run from the repo root: python -m thinkguard.data.audit
+Run order: normalize, filter_train, audit (each as python -m thinkguard.data.<name>).
 Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The critique and
 benchmark rows come from thinkguard.data.sources.load; the Benchmarks section counts them with the unsafe rules in
-configs/data/sources.yaml.
+configs/data/sources.yaml. The Training filter section counts data/interim/critique_filtered.jsonl and
+reports/label_conflicts.jsonl (written by filter_train), and the test sets' data/interim/<name>.jsonl (by normalize).
 Exits 1 if any row has a parse_error or an unknown category.
 """
 
@@ -14,10 +16,19 @@ from collections import Counter, defaultdict
 from itertools import combinations
 from pathlib import Path
 
-from thinkguard.data.sources import SOURCES, is_unsafe, load, load_sources, unsafe_fields, url
+from thinkguard.data.sources import SOURCES, TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
 
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
+TRAIN_FILTERED = Path("data/interim/critique_filtered.jsonl")
+LABEL_CONFLICTS = Path("reports/label_conflicts.jsonl")
+EXCLUSION_REASONS = (  # protocol.md order: first match wins
+    "duplicate",
+    "duplicate_conflict",
+    "teacher_human_conflict",
+    *(f"test_overlap_{name}" for name in TEST_SETS),
+)
+CONFLICT_TYPES = ("teacher_teacher", "teacher_human")
 
 BENCHMARKS = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")
 BENCHMARK_NOTES = (
@@ -229,6 +240,60 @@ def render(stats, keys, n_flags, source):
     return "\n".join(lines) + "\n"
 
 
+def render_train_filter(rows, conflicts, tests):
+    """The "## Training filter" section: rows from critique_filtered.jsonl, conflicts from label_conflicts.jsonl, tests
+    each test set's rows from data/interim/<name>.jsonl. Before -> after the test-overlap rule: the rows whose
+    exclusion_reason is null or test_overlap_* -> null.
+    """
+    reasons = Counter(r["exclusion_reason"] for r in rows)
+    types = Counter(c["type"] for c in conflicts)
+    groups = [n for n in Counter(r["pair_hash"] for r in rows).values() if n > 1]
+    before = [r for r in rows if r["exclusion_reason"] is None or r["exclusion_reason"].startswith("test_overlap_")]
+    after = [r for r in rows if r["exclusion_reason"] is None]
+    label_before, label_after = (Counter(r["teacher_safety_label"] for r in part) for part in (before, after))
+    trained_prompts = {r["prompt_hash"] for r in after}
+
+    def overlap(key, test):
+        values = {t[key] for t in test}
+        return " -> ".join(str(sum(r[key] in values for r in part)) for part in (before, after))
+
+    table = []
+    for name, test in tests.items():
+        pair = "n/a" if all(t["task_type"] == "prompt_only" for t in test) else overlap("pair_hash", test)
+        seen = sum(t["prompt_hash"] in trained_prompts for t in test)
+        table.append(
+            f"| `{name}` | {len(test)} | {pair} | {overlap('prompt_hash', test)} | {seen} ({len(test) - seen} unseen) |"
+        )
+    lines = [
+        "## Training filter",
+        "",
+        (
+            f"Source: `{TRAIN_FILTERED.as_posix()}`, {len(rows)} rows; {reasons[None]} kept."
+            f" Rules: `protocol.md`, Training data filtering. Conflicts: `{LABEL_CONFLICTS.as_posix()}`."
+        ),
+        "",
+        f"- Duplicates (same pair_hash): {len(groups)} groups ({sum(groups)} rows)",
+        f"- Conflicts: {', '.join(f'{t} {types[t]}' for t in CONFLICT_TYPES)}",
+        f"- Exclusions by reason: {', '.join(f'{r} {reasons[r]}' for r in EXCLUSION_REASONS)}",
+        (
+            f"- Teacher labels, before -> after the test-overlap rule: unsafe {label_before['unsafe']} ->"
+            f" {label_after['unsafe']}, safe {label_before['safe']} -> {label_after['safe']}"
+        ),
+        "",
+        (
+            "Test overlap: critique rows whose pair_hash / prompt_hash matches a test row's, before -> after the"
+            " test-overlap rule (before: exclusion_reason null or test_overlap_*; after: null). Each test row's key"
+            " follows its task_type, so a prompt_response set's prompt-only overlap stays. Last column: test rows whose"
+            " prompt_hash is in the critique rows kept after."
+        ),
+        "",
+        "| Test set | Rows | pair_hash overlap | prompt_hash overlap | Test rows with prompt in training |",
+        "|---|---|---|---|---|",
+        *table,
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def render_benchmarks(rows, sources):
     """The "## Benchmarks" section, counted from each benchmark's rows. Missing label cells: null or missing
     gold-label values, summed over the gold-label fields.
@@ -249,6 +314,11 @@ def render_benchmarks(rows, sources):
     return "\n".join([*lines, "", *BENCHMARK_NOTES]) + "\n"
 
 
+def read_jsonl(path):
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f]
+
+
 def write(text, flags, report=REPORT, flags_path=FLAGS):
     report.parent.mkdir(parents=True, exist_ok=True)
     with open(report, "w", encoding="utf-8", newline="\n") as f:
@@ -262,7 +332,10 @@ def main():
     keys = load_keys()
     stats, flags = audit(load("critique"), keys)
     benchmarks = render_benchmarks({name: load(name) for name in BENCHMARKS}, sources)
-    text = "# Data audit\n\n" + render(stats, keys, len(flags), url(sources["critique"])) + "\n" + benchmarks
+    tests = {name: read_jsonl(TRAIN_FILTERED.parent / f"{name}.jsonl") for name in TEST_SETS}
+    train_filter = render_train_filter(read_jsonl(TRAIN_FILTERED), read_jsonl(LABEL_CONFLICTS), tests)
+    critique = render(stats, keys, len(flags), url(sources["critique"]))
+    text = "# Data audit\n\n" + critique + "\n" + train_filter + "\n" + benchmarks
     write(text, flags)
     print(text)
     parse_errors = sum(r["reason"] == "parse_error" for r in flags)

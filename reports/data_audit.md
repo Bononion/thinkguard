@@ -18,6 +18,24 @@ Label source: per the ThinkGuard paper, the critics were given the gold BeaverTa
 - Contradictions (explanation gives a direct verdict for the other label): 2 (rows 2561, 14857)
 - Duplicates: 18 inputs appear more than once (36 rows); 1 pair(s) with different labels: rows 4774 and 5475
 
+## Training filter
+
+Source: `data/interim/critique_filtered.jsonl`, 15000 rows; 14974 kept. Rules: `protocol.md`, Training data filtering. Conflicts: `reports/label_conflicts.jsonl`.
+
+- Duplicates (same pair_hash): 18 groups (36 rows)
+- Conflicts: teacher_teacher 2, teacher_human 0
+- Exclusions by reason: duplicate 16, duplicate_conflict 4, teacher_human_conflict 0, test_overlap_beavertails_30k_test 6, test_overlap_toxicchat_0124_test 0, test_overlap_openai_moderation 0, test_overlap_wildguardtest 0
+- Teacher labels, before -> after the test-overlap rule: unsafe 8515 -> 8512, safe 6465 -> 6462
+
+Test overlap: critique rows whose pair_hash / prompt_hash matches a test row's, before -> after the test-overlap rule (before: exclusion_reason null or test_overlap_*; after: null). Each test row's key follows its task_type, so a prompt_response set's prompt-only overlap stays. Last column: test rows whose prompt_hash is in the critique rows kept after.
+
+| Test set | Rows | pair_hash overlap | prompt_hash overlap | Test rows with prompt in training |
+|---|---|---|---|---|
+| `beavertails_30k_test` | 3021 | 6 -> 0 | 4495 -> 4489 | 2552 (469 unseen) |
+| `toxicchat_0124_test` | 5083 | n/a | 0 -> 0 | 0 (5083 unseen) |
+| `openai_moderation` | 1680 | n/a | 0 -> 0 | 0 (1680 unseen) |
+| `wildguardtest` | 1725 | 0 -> 0 | 0 -> 0 | 0 (1725 unseen) |
+
 ## Benchmarks
 
 | Benchmark | Gold-label field(s) | Rows | Positives | Missing label cells |
