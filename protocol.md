@@ -1,5 +1,40 @@
 # Protocol
 
+## Conditions
+
+Checkpoint revisions are pinned in `configs/frozen/source_manifest.json`. Every condition decodes greedily
+(`do_sample=False`) with the same prompt contract (#48).
+
+| ID | Checkpoint | Decoding | Role |
+|---|---|---|---|
+| B | `meta-llama/Llama-Guard-3-8B` | autoregressive | base model |
+| L | B + `label_category` LoRA | autoregressive | label-only ablation of C |
+| C | B + critique LoRA | autoregressive | our ThinkGuard reproduction |
+| R | `Rakancorle1/ThinkGuard` (released) | autoregressive | reference only |
+
+- In code the label-only condition is named `label_category`: it keeps category supervision and drops only the
+  critique.
+- The early-exit extension's conditions are added once the reproduction is done (#63).
+
+## Research questions
+
+Each question is answered by one comparison, read from one generated artifact. Metrics are defined in #28; paired
+differences use the cluster bootstrap (#65).
+
+| # | Question | Comparison | Metric | Artifact |
+|---|---|---|---|---|
+| 1 | Does training on critiques improve the guard over training on labels alone? | L vs C | unsafe F1 per test set; BeaverTails category macro F1 | `results/table_reproduction.md` |
+| 2 | Does LoRA adaptation improve over the base guard? | B vs L, B vs C | unsafe F1, precision, recall, AUPRC per test set | `results/table_reproduction.md` |
+| 3 | How close is our reproduction to the released ThinkGuard and the paper? | R vs C (reference only) | unsafe F1 per test set | `results/table_reproduction.md` |
+
+R is a reference: it is trained with full fine-tuning on data and settings we cannot fully check, so question 3 gets
+no significance test and no claim beyond "close" or "not close".
+
+## Deviations
+
+- LoRA, not the paper's full fine-tuning, is a project deviation: C reproduces ThinkGuard's method, not its exact
+  weights.
+
 ## Training data filtering
 
 Applies to the critique rows in `data/interim/critique.jsonl`. `python -m thinkguard.data.filter_train` applies these
