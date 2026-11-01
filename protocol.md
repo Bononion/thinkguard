@@ -86,6 +86,57 @@ R passes on a benchmark if `|paper_f1 - paper F1| <= 2.0` percentage points. The
 comparable; a benchmark whose paper scoring we cannot match (for example OpenAI Moderation, where upstream
 `ThinkGuard.py` encodes mismatches as `-1`) is reported with its difference but not gated.
 
+## Selection rules
+
+Every choice made with data uses the training rows or the validation split (`data/manifests/validation.json`, 750
+rows), never a test set.
+
+### Checkpoint selection (L and C)
+
+- Metric: validation `unsafe_f1` (Metrics, Safety label) from decision-only generation, with the same formatter and
+  parser as test evaluation (#59). Invalid outputs count as wrong.
+- Cadence: every `ceil(steps_per_epoch / 4)` optimizer steps (4 times per epoch) and at the last step, the same for L
+  and C. Every scored checkpoint is saved with its validation metrics.
+- Best checkpoint: the highest validation `unsafe_f1`; a tie goes to the earlier step.
+- The paper saves a checkpoint every 500 steps and does not say how it picks one (Section 4.1): selecting on
+  validation is our rule, not the paper's.
+
+### Loss convention (#62)
+
+- Candidates: `token_mean_all` and `segment_mean` with λ = 1, each a pilot-length C run (#61).
+- Choice: the candidate whose best checkpoint has the higher validation `unsafe_f1`; if the two are within 0.5
+  percentage points, `token_mean_all`. The paper sums the label loss and the critique loss over tokens (Section 3.3,
+  Eq. 2-4), which `token_mean_all` is closest to; `segment_mean`, if chosen, is listed under Deviations.
+- L and C use the same convention.
+
+### Other choices
+
+- `score_f1@t`, if reported: `t` maximizes the condition's `score_f1` on validation.
+- Max length and the truncation rule (#51) are chosen from train and validation token lengths only. Test-set lengths
+  are reported (how many test rows the choice truncates) but never used to choose.
+
+### Test-set firewall
+
+- `thinkguard.evaluate` (#9) exits with an error on a split whose name starts with `test_` unless the config file is
+  under `configs/frozen/` and committed: `git status --porcelain <config>` prints nothing.
+- The run manifest (#33) records the git commit and the config hash, so every test number traces to a committed
+  frozen config.
+- A frozen config is never edited after its first test run. A change is a new file, and both runs are reported.
+
+### Harness gate fixes (#13)
+
+R runs on the test sets before any of our conditions, so the gate is the one place where a test score can change our
+code. A fix after a `FAIL` must name a concrete cause (template, parsing, scoring), applies to every condition, and is
+logged in `results/gate.md` with R's numbers before and after. No setting is changed only to move R toward the paper.
+Once the gate passes, the evaluation code is tagged `harness-frozen` in git before B, L or C runs on a test set.
+
+### When test numbers are read
+
+- R at the gate (#12, #13); B after the gate (#64); L and C after their checkpoints are frozen (#63).
+- The extension's selection rules (the E vs C quality tolerance, the exit-depth and draft-length rule) are added to
+  this section and committed before L or C runs on a test set (#17, #18), so no extension rule is written after
+  seeing their test numbers.
+
 ## Deviations
 
 - LoRA, not the paper's full fine-tuning, is a project deviation: C reproduces ThinkGuard's method, not its exact
