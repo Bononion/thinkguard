@@ -1,0 +1,27 @@
+# Experiment registry, loaded by thinkguard.registry.load: one entry per condition in protocol.md, Conditions.
+# base is a model name in configs/frozen/source_manifest.json, which pins its revision. adapter is the path of the
+# trained LoRA adapter, null until the entry is trained.
+- id: B
+  role: base model
+  base: llama-guard-3-8b
+  parent: null
+  adapter: null
+  decode: greedy
+- id: L
+  role: label-only ablation of C
+  base: llama-guard-3-8b
+  parent: B
+  adapter: null
+  decode: greedy
+- id: C
+  role: our ThinkGuard reproduction
+  base: llama-guard-3-8b
+  parent: B
+  adapter: null
+  decode: greedy
+- id: R
+  role: reference only
+  base: thinkguard-released
+  parent: null
+  adapter: null
+  decode: greedy
