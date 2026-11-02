@@ -26,23 +26,7 @@ from thinkguard.data.split import MIN_PER_CATEGORY, choose_seed, group_split
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
 
-BENCHMARKS = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")
-BENCHMARK_NOTES = (
-    "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
-    (
-        "- OpenAI Moderation is unsafe if any of S, H, V, HR, SH, S3, H2, V2 equals 1. The upstream README gives no"
-        " binary rule; this follows AI2's safety-eval (used for the WildGuard paper),"
-        " which gives the same 522 positives."
-    ),
-    (
-        "- OpenAI Moderation: 925 rows lack a label for at least one category. Upstream says a missing label means"
-        " unknown; we count it as not flagged, as safety-eval does. No row lacks all 8."
-    ),
-    (
-        "- WildGuardTest: gold label is response_harm_label (provisional; our models classify the agent turn, matching"
-        " safety-eval's wildguardtest_response task). prompt_harm_label is the alternative; final choice in #48."
-    ),
-)
+BENCHMARK_TABLE = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")  # BeaverTails: data/README.md
 
 FIELDS = ("instruction", "input", "output")
 HEADER = re.compile(r"^- (Safety Assessment|Categories|Explanation):", re.MULTILINE)
@@ -298,14 +282,35 @@ def render_benchmarks(rows, sources):
         "| Benchmark | Gold-label field(s) | Rows | Positives | Missing label cells |",
         "|---|---|---|---|---|",
     ]
-    for name in BENCHMARKS:
+    for name in BENCHMARK_TABLE:
         rule = sources[name]["unsafe"]
         fields = unsafe_fields(rule)
         positives = sum(is_unsafe(r, rule) for r in rows[name])
         missing = sum(r.get(f) is None for r in rows[name] for f in fields)
         gold = ", ".join(f"`{f}`" for f in fields)
         lines.append(f"| `{name}` | {gold} | {len(rows[name])} | {positives} | {missing} |")
-    return "\n".join([*lines, "", *BENCHMARK_NOTES]) + "\n"
+    notes = benchmark_notes(rows["openai_moderation"], sources["openai_moderation"]["unsafe"])
+    return "\n".join([*lines, "", *notes]) + "\n"
+
+
+def benchmark_notes(moderation, rule):
+    """The notes under the Benchmarks table. OpenAI Moderation counts come from its rows; 522 is safety-eval's count,
+    which sources.load already enforces as unsafe_rows.
+    """
+    fields = unsafe_fields(rule)
+    missing = [sum(r.get(f) is None for f in fields) for r in moderation]
+    some, every = sum(n > 0 for n in missing), sum(n == len(fields) for n in missing)
+    lack_all = f"{every} rows lack all {len(fields)}." if every else f"No row lacks all {len(fields)}."
+    return (
+        "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
+        f"- OpenAI Moderation is unsafe if any of {', '.join(fields)} equals {rule['equals']}. The upstream README"
+        " gives no binary rule; this follows AI2's safety-eval (used for the WildGuard paper), which gives the same"
+        " 522 positives.",
+        f"- OpenAI Moderation: {some} rows lack a label for at least one category. Upstream says a missing label means"
+        f" unknown; we count it as not flagged, as safety-eval does. {lack_all}",
+        "- WildGuardTest: gold label is response_harm_label (provisional; our models classify the agent turn, matching"
+        " safety-eval's wildguardtest_response task). prompt_harm_label is the alternative; final choice in #48.",
+    )
 
 
 def read_jsonl(path):
@@ -325,7 +330,7 @@ def main():
     sources = {s["name"]: s for s in load_sources()}
     keys = load_keys()
     stats, flags = audit(load("critique"), keys)
-    benchmarks = render_benchmarks({name: load(name) for name in BENCHMARKS}, sources)
+    benchmarks = render_benchmarks({name: load(name) for name in BENCHMARK_TABLE}, sources)
     filtered = read_examples(TRAIN_FILTERED)
     tests = {name: read_examples(TRAIN_FILTERED.parent / f"{name}.jsonl") for name in TEST_SETS}
     train_filter = render_train_filter(filtered, read_jsonl(LABEL_CONFLICTS), tests)
