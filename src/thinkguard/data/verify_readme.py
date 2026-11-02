@@ -26,7 +26,7 @@ from thinkguard.paths import ROOT, rel
 README = ROOT / "data/README.md"
 START, END = "<!-- numbers:start -->\n", "<!-- numbers:end -->"
 RULES = "../protocol.md#training-data-filtering"
-SPLITS = ("train", "validation", "smoke", "pilot", *(f"test_{name}" for name in TEST_SETS))  # Splits table order
+SPLITS = ("train", "validation", "smoke", "pilot", *(f"test_{name}" for name in TEST_SETS))  # every manifest
 WHY = {  # one line per exclusion_reason; a reason in the data with no line here raises KeyError
     "duplicate": "same `pair_hash` and targets as a row with a lower `raw_record_id`",
     "duplicate_conflict": "same `pair_hash` as a row with different targets",
@@ -43,12 +43,6 @@ def unsafe(examples):
     """Rows labeled unsafe: by teacher label for critique rows, by gold label for test-set rows."""
     labels = (e.teacher_safety_label if e.source_dataset == "critique" else e.gold_safety_label for e in examples)
     return sum(label == "unsafe" for label in labels)
-
-
-def splits():
-    """The split of every manifest in data/manifests/: SPLITS in that order, then any others by name."""
-    order = {split: i for i, split in enumerate(SPLITS)}
-    return sorted((p.stem for p in MANIFESTS.glob("*.json")), key=lambda split: (order.get(split, len(order)), split))
 
 
 def block():
@@ -89,10 +83,7 @@ def block():
         "",
         "| exclusion_reason | Rows | Rule |",
         "|---|---|---|",
-        *(
-            row(f"`{r}`", reasons[r], f"[{WHY[r]}]({RULES})")
-            for r in (*EXCLUSION_REASONS, *sorted(set(reasons) - {None, *EXCLUSION_REASONS}))
-        ),
+        *(row(f"`{r}`", reasons[r], f"[{WHY[r]}]({RULES})") for r in EXCLUSION_REASONS),
     ]
 
     lines += [
@@ -107,7 +98,7 @@ def block():
         "| Split | Rows | Unsafe rows |",
         "|---|---|---|",
     ]
-    for split in splits():
+    for split in SPLITS:
         examples = load_split(split)
         lines.append(row(f"`{split}`", len(examples), unsafe(examples)))
     return "\n".join(lines) + "\n"
@@ -117,7 +108,7 @@ def committed_rows():
     """{table: its expected rows cut to two cells}: each source's name and revision, each split's name and len(ids)."""
     sources = {s["name"]: s for s in load_sources()}
     tables = {"Sources": [row(f"`{name}`", f"`{sources[name]['revision']}`") for name in SOURCES], "Splits": []}
-    for split in splits():
+    for split in SPLITS:
         with open(MANIFESTS / f"{split}.json", encoding="utf-8") as f:
             tables["Splits"].append(row(f"`{split}`", len(json.load(f)["ids"])))
     return tables
@@ -138,6 +129,13 @@ def read_readme():
     return head, current, tail
 
 
+def check(expected, actual, where, first=1):
+    """Exit 1 with the first line, numbered from first, where actual differs from expected."""
+    for i, (want, have) in enumerate(zip_longest(expected, actual), first):
+        if want != have:
+            sys.exit(f"FAIL: data/README.md {where} {i}:\n  README:   {have}\n  expected: {want}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Check or regenerate the numbers block of data/README.md.")
     mode = parser.add_mutually_exclusive_group()
@@ -148,9 +146,7 @@ def main():
 
     if args.committed_only:
         for heading, expected in committed_rows().items():
-            for i, (want, have) in enumerate(zip_longest(expected, table_rows(current, heading)), 1):
-                if want != have:
-                    sys.exit(f"FAIL: data/README.md {heading} table, row {i}:\n  README:   {have}\n  expected: {want}")
+            check(expected, table_rows(current, heading), f"{heading} table, row")
         print("data/README.md: source revisions and split rows match")
         return
 
@@ -160,10 +156,7 @@ def main():
             f.write(head + START + new + END + tail)
         print(new, end="")
         return
-    first = head.count("\n") + 2  # the README line number of the block's first line
-    for i, (want, have) in enumerate(zip_longest(new.splitlines(), current.splitlines()), first):
-        if want != have:
-            sys.exit(f"FAIL: data/README.md line {i} differs from the data:\n  README:   {have}\n  expected: {want}")
+    check(new.splitlines(), current.splitlines(), "line", head.count("\n") + 2)  # + 2: the block's first line
     print("data/README.md: numbers match the data")
 
 
