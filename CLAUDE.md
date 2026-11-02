@@ -20,22 +20,27 @@ packages waiting for P3+.
 ## Commands
 
 Setup is Linux + NVIDIA GPU (`bash scripts/setup_env.sh`, needs `HF_HOME`, `CKPT_DIR`, and `HF_TOKEN` for the gated
-Llama Guard / WildGuardTest). The data code and tests run anywhere with `pip install -e .`.
+Llama Guard / WildGuardTest). The data code and tests run anywhere after `uv sync`. Run everything through `uv run`;
+never `pip install` into `.venv`. Add or change a dependency with `uv add` so `uv.lock` stays in sync.
 
 ```bash
-ruff check                                   # line length 120, py311
-pytest -m "not gpu"                          # what CI runs; `gpu` marker = needs CUDA
-pytest tests/test_manifest.py::test_written_manifest_loads_and_an_edited_id_raises
-python -m thinkguard.data.verify_readme --committed-only   # also in CI
+uv sync                                      # .venv from uv.lock; add --group gpu on the GPU host
+uv run ruff check                            # line length 120, py311
+uv run ruff format --check
+uv run pytest -m "not gpu"                   # what CI runs; `gpu` marker = needs CUDA
+uv run pytest tests/test_manifest.py::test_written_manifest_loads_and_an_edited_id_raises
+uv run python -m thinkguard.data.verify_readme --committed-only   # also in CI
 ```
 
 Data pipeline, run from the repo root in this order (each module's docstring says what it reads and writes):
 
-1. `python -m thinkguard.data.normalize` → `data/interim/<source>.jsonl` (not in git)
-2. `python -m thinkguard.data.filter_train` → `data/interim/critique_filtered.jsonl`, `reports/label_conflicts.jsonl`
-3. `python -m thinkguard.data.manifest` → `data/manifests/<split>.json` (in git)
-4. `python -m thinkguard.data.audit` → `reports/data_audit.md`
-5. `python -m thinkguard.data.verify_readme [--write]` → checks/regenerates the numbers block in `data/README.md`
+1. `uv run python -m thinkguard.data.normalize` → `data/interim/<source>.jsonl` (not in git)
+2. `uv run python -m thinkguard.data.filter_train` → `data/interim/critique_filtered.jsonl`,
+   `reports/label_conflicts.jsonl`
+3. `uv run python -m thinkguard.data.manifest` → `data/manifests/<split>.json` (in git)
+4. `uv run python -m thinkguard.data.audit` → `reports/data_audit.md`
+5. `uv run python -m thinkguard.data.verify_readme [--write]` → checks/regenerates the numbers block in
+   `data/README.md`
 
 ## Architecture and invariants
 

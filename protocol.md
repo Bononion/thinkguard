@@ -144,9 +144,9 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
 
 ## Training data filtering
 
-Applies to the critique rows in `data/interim/critique.jsonl`. `python -m thinkguard.data.filter_train` applies these
-rules and writes every row to `data/interim/critique_filtered.jsonl` with its `exclusion_reason` set, and each conflict
-to `reports/label_conflicts.jsonl`.
+Applies to the critique rows in `data/interim/critique.jsonl`. `uv run python -m thinkguard.data.filter_train` applies
+these rules and writes every row to `data/interim/critique_filtered.jsonl` with its `exclusion_reason` set, and each
+conflict to `reports/label_conflicts.jsonl`.
 
 - Duplicates are critique rows with the same `pair_hash`. Their targets are `teacher_safety_label` plus
   `teacher_categories`; the critique text is ignored (two critiques of the same label are both valid).
@@ -172,7 +172,7 @@ to `reports/label_conflicts.jsonl`.
 ## Validation split
 
 Applies to the rows of `data/interim/critique_filtered.jsonl` whose `exclusion_reason` is null (the rows kept for
-training). `thinkguard.data.split` applies these rules; `python -m thinkguard.data.audit` reports the result in
+training). `thinkguard.data.split` applies these rules; `uv run python -m thinkguard.data.audit` reports the result in
 `reports/data_audit.md`, Validation split.
 
 - Validation is about 5% of the kept training rows, grouped by `prompt_hash`: every row with the same prompt goes to

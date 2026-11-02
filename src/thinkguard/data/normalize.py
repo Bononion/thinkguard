@@ -1,6 +1,6 @@
 """Normalize every source into Example rows, one JSON line each in data/interim/<source>.jsonl.
 
-Run from the repo root: python -m thinkguard.data.normalize
+Run from the repo root: uv run python -m thinkguard.data.normalize
 Rows that fail to parse are dropped and counted by parse_status. Benchmark gold labels follow each source's unsafe
 rule in configs/data/sources.yaml. Critique rows take their teacher label from the critique and their gold label
 from the beavertails_30k_train annotations of the same pair; neither is ever filled from the other.

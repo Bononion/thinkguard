@@ -1,6 +1,6 @@
 """Frozen split manifests: the example_ids of each split, so every run trains and scores on the same rows.
 
-Run from the repo root, after filter_train: python -m thinkguard.data.manifest
+Run from the repo root, after filter_train: uv run python -m thinkguard.data.manifest
 Writes data/manifests/<split>.json for train, validation, smoke and pilot (by the rules in protocol.md, Validation
 split) and for test_<set>, every row of each test set in sources.TEST_SETS, and prints each split's row count.
 Each manifest has the split's source file, its ids in source file order and the sha256 of its rows' Example.to_json()

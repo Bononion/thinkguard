@@ -1,7 +1,7 @@
 """Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
 
-Run from the repo root: python -m thinkguard.data.audit
-Run order: normalize, filter_train, audit (each as python -m thinkguard.data.<name>).
+Run from the repo root: uv run python -m thinkguard.data.audit
+Run order: normalize, filter_train, audit (each as uv run python -m thinkguard.data.<name>).
 Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The critique and
 benchmark rows come from thinkguard.data.sources.load; the Benchmarks section counts them with the unsafe rules in
 configs/data/sources.yaml. The Training filter section counts data/interim/critique_filtered.jsonl and

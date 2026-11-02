@@ -1,6 +1,6 @@
 """Filter the critique rows for training (exact duplicates, label conflicts, test overlap) by the rules in protocol.md.
 
-Run from the repo root, after normalize: python -m thinkguard.data.filter_train
+Run from the repo root, after normalize: uv run python -m thinkguard.data.filter_train
 Writes data/interim/critique_filtered.jsonl (every row in raw order, exclusion_reason set on the excluded ones) and
 reports/label_conflicts.jsonl (one line per conflict), and prints the counts.
 No timestamps, so a rerun is byte-identical.
