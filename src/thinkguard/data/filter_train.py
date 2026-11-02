@@ -12,15 +12,10 @@ from dataclasses import replace
 
 from thinkguard.data import audit
 from thinkguard.data.normalize import BENCHMARKS, INTERIM, counts, write
-from thinkguard.data.schema import Example
+from thinkguard.data.schema import read_examples
 
 CRITIQUE = INTERIM / "critique.jsonl"
 TEST_KEY = {"prompt_response": "pair_hash", "prompt_only": "prompt_hash"}  # a test row's key, by its task_type
-
-
-def read(path):
-    with open(path, encoding="utf-8") as f:
-        return [Example.from_json(line) for line in f]
 
 
 def test_key(t):
@@ -80,8 +75,9 @@ def filter_rows(examples, tests):
 
 
 def main():
-    examples = read(CRITIQUE)
-    filtered, conflicts = filter_rows(examples, {name: read(INTERIM / f"{name}.jsonl") for name in BENCHMARKS})
+    examples = read_examples(CRITIQUE)
+    tests = {name: read_examples(INTERIM / f"{name}.jsonl") for name in BENCHMARKS}
+    filtered, conflicts = filter_rows(examples, tests)
     write(filtered, audit.TRAIN_FILTERED)
     audit.LABEL_CONFLICTS.parent.mkdir(parents=True, exist_ok=True)
     with open(audit.LABEL_CONFLICTS, "w", encoding="utf-8", newline="\n") as f:
