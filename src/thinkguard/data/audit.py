@@ -18,21 +18,13 @@ from itertools import combinations
 from pathlib import Path
 
 from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup, split_pieces
+from thinkguard.data.filter_train import CONFLICT_TYPES, EXCLUSION_REASONS, LABEL_CONFLICTS, TRAIN_FILTERED
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
 from thinkguard.data.split import MIN_PER_CATEGORY, choose_seed, group_split
 
 REPORT = Path("reports/data_audit.md")
 FLAGS = Path("reports/critique_flags.jsonl")
-TRAIN_FILTERED = Path("data/interim/critique_filtered.jsonl")
-LABEL_CONFLICTS = Path("reports/label_conflicts.jsonl")
-EXCLUSION_REASONS = (  # protocol.md order: first match wins
-    "duplicate",
-    "duplicate_conflict",
-    "teacher_human_conflict",
-    *(f"test_overlap_{name}" for name in TEST_SETS),
-)
-CONFLICT_TYPES = ("teacher_teacher", "teacher_human")
 
 BENCHMARKS = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")
 BENCHMARK_NOTES = (

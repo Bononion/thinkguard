@@ -11,7 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from thinkguard.data.audit import TRAIN_FILTERED
+from thinkguard.data.filter_train import TRAIN_FILTERED
 from thinkguard.data.normalize import INTERIM
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS

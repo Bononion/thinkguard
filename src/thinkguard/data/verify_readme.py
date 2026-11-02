@@ -17,7 +17,7 @@ from collections import Counter
 from itertools import zip_longest
 from pathlib import Path
 
-from thinkguard.data.audit import EXCLUSION_REASONS, TRAIN_FILTERED
+from thinkguard.data.filter_train import EXCLUSION_REASONS, TRAIN_FILTERED
 from thinkguard.data.manifest import MANIFESTS, load_split
 from thinkguard.data.normalize import GOLD_SPLIT, INTERIM, SOURCES
 from thinkguard.data.schema import read_examples
