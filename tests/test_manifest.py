@@ -1,16 +1,13 @@
 """thinkguard.data.manifest on rows built here."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from thinkguard.data.keys import prompt_hash
-from thinkguard.data.manifest import load_split, write
+from thinkguard.data.manifest import MANIFESTS, load_split, write
 from thinkguard.data.schema import Example
 from thinkguard.data.split import PILOT_SIZE, SMOKE_SIZE
-
-MANIFESTS = Path(__file__).parents[1] / "data/manifests"
 
 ROWS = [
     Example(

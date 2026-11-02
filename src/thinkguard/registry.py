@@ -8,14 +8,14 @@ The file is a list, not a mapping keyed by id, so a repeated id is an error inst
 import collections
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
 import yaml
 
 from thinkguard.config import from_dict
+from thinkguard.paths import ROOT
 
-REGISTRY = Path("configs/experiment_registry.yaml")
-SOURCE_MANIFEST = Path("configs/frozen/source_manifest.json")
+REGISTRY = ROOT / "configs/experiment_registry.yaml"
+SOURCE_MANIFEST = ROOT / "configs/frozen/source_manifest.json"
 DECODES = ("greedy", "self_speculative")
 
 

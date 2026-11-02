@@ -15,15 +15,15 @@ import json
 import sys
 from collections import Counter
 from itertools import zip_longest
-from pathlib import Path
 
 from thinkguard.data.filter_train import EXCLUSION_REASONS, TRAIN_FILTERED
 from thinkguard.data.manifest import MANIFESTS, load_split
 from thinkguard.data.normalize import GOLD_SPLIT, INTERIM, SOURCES
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS, load_sources
+from thinkguard.paths import ROOT, rel
 
-README = Path("data/README.md")
+README = ROOT / "data/README.md"
 START, END = "<!-- numbers:start -->\n", "<!-- numbers:end -->"
 RULES = "../protocol.md#training-data-filtering"
 SPLITS = ("train", "validation", "smoke", "pilot", *(f"test_{name}" for name in TEST_SETS))  # Splits table order
@@ -83,7 +83,7 @@ def block():
         "### Critique exclusions",
         "",
         (
-            f"`{TRAIN_FILTERED.as_posix()}`: {reasons[None]} of {len(filtered)} rows kept. A row gets the first reason"
+            f"`{rel(TRAIN_FILTERED)}`: {reasons[None]} of {len(filtered)} rows kept. A row gets the first reason"
             " that matches, in this order."
         ),
         "",

@@ -9,15 +9,15 @@ No timestamps, so a rerun is byte-identical.
 import json
 from collections import Counter, defaultdict
 from dataclasses import replace
-from pathlib import Path
 
 from thinkguard.data.normalize import INTERIM, counts, write
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS
+from thinkguard.paths import ROOT
 
 CRITIQUE = INTERIM / "critique.jsonl"
 TRAIN_FILTERED = INTERIM / "critique_filtered.jsonl"
-LABEL_CONFLICTS = Path("reports/label_conflicts.jsonl")
+LABEL_CONFLICTS = ROOT / "reports/label_conflicts.jsonl"
 EXCLUSION_REASONS = (  # protocol.md order: first match wins
     "duplicate",
     "duplicate_conflict",

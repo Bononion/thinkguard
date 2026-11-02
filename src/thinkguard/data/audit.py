@@ -15,16 +15,16 @@ import re
 import sys
 from collections import Counter, defaultdict
 from itertools import combinations
-from pathlib import Path
 
 from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup, split_pieces
 from thinkguard.data.filter_train import CONFLICT_TYPES, EXCLUSION_REASONS, LABEL_CONFLICTS, TRAIN_FILTERED
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
 from thinkguard.data.split import MIN_PER_CATEGORY, choose_seed, group_split
+from thinkguard.paths import ROOT, rel
 
-REPORT = Path("reports/data_audit.md")
-FLAGS = Path("reports/critique_flags.jsonl")
+REPORT = ROOT / "reports/data_audit.md"
+FLAGS = ROOT / "reports/critique_flags.jsonl"
 
 BENCHMARK_TABLE = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")  # BeaverTails: data/README.md
 
@@ -156,7 +156,7 @@ def render(stats, keys, n_flags, source):
     lines = [
         "## Critique release",
         "",
-        f"Source: `{source}`, {stats['rows']} rows. Flagged rows: `{FLAGS.as_posix()}` ({n_flags} lines).",
+        f"Source: `{source}`, {stats['rows']} rows. Flagged rows: `{rel(FLAGS)}` ({n_flags} lines).",
         "",
         "Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.",
         "",
@@ -217,8 +217,8 @@ def render_train_filter(rows, conflicts, tests):
         "## Training filter",
         "",
         (
-            f"Source: `{TRAIN_FILTERED.as_posix()}`, {len(rows)} rows; {reasons[None]} kept."
-            f" Rules: `protocol.md`, Training data filtering. Conflicts: `{LABEL_CONFLICTS.as_posix()}`."
+            f"Source: `{rel(TRAIN_FILTERED)}`, {len(rows)} rows; {reasons[None]} kept."
+            f" Rules: `protocol.md`, Training data filtering. Conflicts: `{rel(LABEL_CONFLICTS)}`."
         ),
         "",
         f"- Duplicates (same pair_hash): {len(groups)} groups ({sum(groups)} rows)",
@@ -253,10 +253,7 @@ def render_split(examples, keys):
     lines = [
         "## Validation split",
         "",
-        (
-            f"Source: the {len(examples)} kept rows of `{TRAIN_FILTERED.as_posix()}`."
-            " Rules: `protocol.md`, Validation split."
-        ),
+        f"Source: the {len(examples)} kept rows of `{rel(TRAIN_FILTERED)}`. Rules: `protocol.md`, Validation split.",
         "",
         f"- Seed: {seed}. Rejected (a category under {MIN_PER_CATEGORY} validation rows): {rejected or 'none'}",
     ]

@@ -18,17 +18,17 @@ import json
 import platform
 import signal
 import subprocess
-from pathlib import Path
 
 from thinkguard.config import config_hash
 from thinkguard.data.manifest import MANIFESTS
+from thinkguard.paths import ROOT
 
-RUNS = Path("runs")
+RUNS = ROOT / "runs"
 CODE = ("src", "configs", "scripts")  # an untracked file here can change what a run does
 
 
 def git(*args):
-    return subprocess.run(["git", *args], capture_output=True, text=True, check=True).stdout.strip()
+    return subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, check=True).stdout.strip()
 
 
 def packages_sha256():
