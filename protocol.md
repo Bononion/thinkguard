@@ -58,7 +58,7 @@ From the label the model generates. The positive class is `unsafe`.
   serialized context (#53). It is never conditioned on gold labels, gold categories or an explanation, and every
   scored row has one, valid output or not.
 - `unsafe_auprc`: `sklearn.metrics.average_precision_score(gold == "unsafe", unsafe_score)`, scikit-learn 1.9.1
-  (`requirements.txt`). Average precision is a step-wise sum, not an interpolated area under the PR curve, so it is not
+  (`pyproject.toml`). Average precision is a step-wise sum, not an interpolated area under the PR curve, so it is not
   guaranteed equal to the paper's AUPRC.
 - The primary F1 is always the generated-label `unsafe_f1`. An F1 from thresholding the unsafe score, if reported, is
   named `score_f1@t`, with `t` fixed on validation, never on a test set.
