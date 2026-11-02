@@ -1,0 +1,37 @@
+benchmark,model,metric,value,source
+beavertails_30k_test,LLaMA Guard 3,F1,64.5,Table 1 p.13703
+beavertails_30k_test,LLaMA Guard 3,AUPRC,87.9,Table 1 p.13703
+toxicchat_0124_test,LLaMA Guard 3,F1,43.4,Table 1 p.13703
+toxicchat_0124_test,LLaMA Guard 3,AUPRC,55.6,Table 1 p.13703
+openai_moderation,LLaMA Guard 3,F1,77.2,Table 1 p.13703
+openai_moderation,LLaMA Guard 3,AUPRC,80.2,Table 1 p.13703
+wildguardtest,LLaMA Guard 3,F1,72.6,Table 1 p.13703
+wildguardtest,LLaMA Guard 3,AUPRC,76.8,Table 1 p.13703
+beavertails_30k_test,LLaMA Guard 3 + Label-only SFT,F1,83.7,Table 1 p.13703
+beavertails_30k_test,LLaMA Guard 3 + Label-only SFT,AUPRC,91.0,Table 1 p.13703
+toxicchat_0124_test,LLaMA Guard 3 + Label-only SFT,F1,56.0,Table 1 p.13703
+toxicchat_0124_test,LLaMA Guard 3 + Label-only SFT,AUPRC,59.1,Table 1 p.13703
+openai_moderation,LLaMA Guard 3 + Label-only SFT,F1,75.6,Table 1 p.13703
+openai_moderation,LLaMA Guard 3 + Label-only SFT,AUPRC,80.9,Table 1 p.13703
+wildguardtest,LLaMA Guard 3 + Label-only SFT,F1,73.8,Table 1 p.13703
+wildguardtest,LLaMA Guard 3 + Label-only SFT,AUPRC,76.2,Table 1 p.13703
+beavertails_30k_test,ThinkGuard,F1,82.7,Table 1 p.13703
+beavertails_30k_test,ThinkGuard,AUPRC,91.7,Table 1 p.13703
+toxicchat_0124_test,ThinkGuard,F1,63.5,Table 1 p.13703
+toxicchat_0124_test,ThinkGuard,AUPRC,65.3,Table 1 p.13703
+openai_moderation,ThinkGuard,F1,77.3,Table 1 p.13703
+openai_moderation,ThinkGuard,AUPRC,80.7,Table 1 p.13703
+wildguardtest,ThinkGuard,F1,78.6,Table 1 p.13703
+wildguardtest,ThinkGuard,AUPRC,80.3,Table 1 p.13703
+beavertails_30k_test,LLaMA Guard 3,Accuracy,65.2,Table 3 p.13704
+beavertails_30k_test,LLaMA Guard 3,Macro F1,49.4,Table 3 p.13704
+beavertails_30k_test,LLaMA Guard 3 + Label-only SFT,Accuracy,79.1,Table 3 p.13704
+beavertails_30k_test,LLaMA Guard 3 + Label-only SFT,Macro F1,75.4,Table 3 p.13704
+beavertails_30k_test,ThinkGuard,Accuracy,81.6,Table 3 p.13704
+beavertails_30k_test,ThinkGuard,Macro F1,77.5,Table 3 p.13704
+beavertails_30k_test,LLaMA Guard 3 + Label-only SFT,F1,83.7,Sec 4.2 text on Fig 3 (15k) p.13705
+beavertails_30k_test,ThinkGuard,F1,82.3,Sec 4.2 text on Fig 3 (15k) p.13705
+beavertails_30k_test,ThinkGuard,Macro F1,76.4,Sec 4.2 text on Fig 3 (15k) p.13705
+beavertails_30k_test,ThinkGuard,Accuracy,81.2,Table 4 (15k Cla-Exp SFT) p.13710
+beavertails_30k_test,ThinkGuard,F1,82.3,Table 4 (15k Cla-Exp SFT) p.13710
+beavertails_30k_test,ThinkGuard,Macro F1,76.4,Table 4 (15k Cla-Exp SFT) p.13710
