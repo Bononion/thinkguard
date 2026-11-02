@@ -1,4 +1,4 @@
-"""The experiment registry (configs/experiment_registry.yaml): the conditions of protocol.md, Conditions, one entry each.
+"""The experiment registry (configs/experiment_registry.yaml): one entry per condition in protocol.md, Conditions.
 
 An entry names its base model by its name in configs/frozen/source_manifest.json, which pins the revision, and the
 entry it is trained from (parent). adapter is the path of the trained LoRA adapter, null until the entry is trained.

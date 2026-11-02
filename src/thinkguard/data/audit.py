@@ -38,7 +38,8 @@ BENCHMARK_NOTES = (
     "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
     (
         "- OpenAI Moderation is unsafe if any of S, H, V, HR, SH, S3, H2, V2 equals 1. The upstream README gives no"
-        " binary rule; this follows AI2's safety-eval (used for the WildGuard paper), which gives the same 522 positives."
+        " binary rule; this follows AI2's safety-eval (used for the WildGuard paper),"
+        " which gives the same 522 positives."
     ),
     (
         "- OpenAI Moderation: 925 rows lack a label for at least one category. Upstream says a missing label means"
@@ -302,7 +303,7 @@ def render_split(examples, keys):
     choose_seed picks; keys order the category table.
     """
     seed, failures = choose_seed(examples)
-    sides = dict(zip(("Train", "Validation"), group_split(examples, seed=seed)))
+    sides = dict(zip(("Train", "Validation"), group_split(examples, seed=seed), strict=True))
     rejected = "; ".join(f"seed {s} ({', '.join(f'{c} {n}' for c, n in low.items())})" for s, low in failures.items())
     lines = [
         "## Validation split",
