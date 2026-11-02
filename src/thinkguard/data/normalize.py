@@ -18,7 +18,7 @@ from thinkguard.data.keys import pair_hash, prompt_hash
 from thinkguard.data.schema import Example
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields
 
-GOLD_SPLIT = "beavertails_30k_train"  # the critique release's source split (#42)
+GOLD_SPLIT = "beavertails_30k_train"  # the critique release's source split (#42, reports/source_match.md)
 INTERIM = Path("data/interim")
 
 

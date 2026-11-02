@@ -38,22 +38,6 @@
   unsafe: {field: is_safe, equals: false}
   rows: 27186
   unsafe_rows: 15582
-- name: beavertails_330k_train
-  url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/330k/train.jsonl.xz
-  revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
-  format: jsonl.xz
-  split: train
-  unsafe: {field: is_safe, equals: false}
-  rows: 300567
-  unsafe_rows: 166382
-- name: beavertails_330k_test
-  url: https://huggingface.co/datasets/PKU-Alignment/BeaverTails/resolve/{revision}/round0/330k/test.jsonl.xz
-  revision: 8401fe609d288129cc684a9b3be6a93e41cfe678
-  format: jsonl.xz
-  split: test
-  unsafe: {field: is_safe, equals: false}
-  rows: 33396
-  unsafe_rows: 18689
 - name: toxicchat_0124_test
   url: https://huggingface.co/datasets/lmsys/toxic-chat/resolve/{revision}/data/0124/toxic-chat_annotation_test.csv
   revision: 29df8e4dba60e1f4af4b4075c0705c5b313548a8

@@ -11,7 +11,7 @@ import yaml
 from datasets import load_dataset
 
 SOURCES = Path("configs/data/sources.yaml")
-BUILDERS = {"json": "json", "jsonl.gz": "json", "jsonl.xz": "json", "csv": "csv", "parquet": "parquet"}
+BUILDERS = {"json": "json", "jsonl.gz": "json", "csv": "csv", "parquet": "parquet"}
 # The test sets every train-test check covers.
 TEST_SETS = ("beavertails_30k_test", "toxicchat_0124_test", "openai_moderation", "wildguardtest")
 
