@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 from functools import partial
 from pathlib import Path
 
-from thinkguard.data import audit
+from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup
 from thinkguard.data.keys import pair_hash, prompt_hash
 from thinkguard.data.schema import Example
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields
@@ -92,14 +92,14 @@ def gold_annotations(rows, rule):
 
 def critique(row, keys, gold):
     """Teacher fields parsed from the critique; gold from gold_annotations of the same pair, if they all agree."""
-    m = audit.INPUT.match(row["input"])
+    m = INPUT.match(row["input"])
     if m is None:
         return "input_unparsed"
-    label = audit.LABEL.search(row["output"])
+    label = LABEL.search(row["output"])
     if label is None:
         return "label_unparsed"
-    cats = audit.CATEGORIES.search(row["output"])
-    found, unknown = audit.regroup(cats.group(1).strip(), keys) if cats else ([], [])
+    cats = CATEGORIES.search(row["output"])
+    found, unknown = regroup(cats.group(1).strip(), keys) if cats else ([], [])
     if unknown:
         return "unknown_category"
     prompt, response = m.groups()
@@ -174,7 +174,7 @@ def main():
     sources = {s["name"]: s for s in load_sources()}
     gold = gold_annotations(load(GOLD_SPLIT), sources[GOLD_SPLIT]["unsafe"])
     to_fields = {name: partial(fn, rule=sources[name]["unsafe"]) for name, fn in BENCHMARKS.items()}
-    to_fields["critique"] = partial(critique, keys=audit.load_keys(), gold=gold)
+    to_fields["critique"] = partial(critique, keys=load_keys(), gold=gold)
 
     mismatches = []
     for name in SOURCES:
