@@ -58,5 +58,6 @@ Data pipeline, run from the repo root in this order (each module's docstring say
 
 - Docstrings state exactly what a function returns or raises; module docstrings start with what it does, then
   "Run from the repo root: python -m ..." and what it writes. Match that style.
-- Commits: `[#N] Imperative title`, body `Closes #N` or `Part of #N` (with what's left). Branches: `p<phase>-<topic>`.
-  PR titles list the issues (`[#44, #45] ...`); only `Closes #N` lines in the PR body close issues.
+- Commits: one concrete, reviewable step each (aim for < 100 changed lines), short imperative title. A commit doesn't
+  need its own issue; add `Closes #N` / `Part of #N` to the body when it belongs to one.
+- Branches: `p<phase>-<topic>`, or `refactor/<topic>` for cleanup. Only `Closes #N` lines in a PR body close issues.
