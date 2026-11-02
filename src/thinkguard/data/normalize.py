@@ -14,7 +14,7 @@ from functools import partial
 
 from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup
 from thinkguard.data.keys import pair_hash, prompt_hash
-from thinkguard.data.schema import Example
+from thinkguard.data.schema import Example, write_examples
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields
 from thinkguard.paths import ROOT
 
@@ -160,12 +160,6 @@ def normalize(name, source, rows, to_fields):
     return examples, status
 
 
-def write(examples, path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.writelines(e.to_json() + "\n" for e in examples)
-
-
 def counts(counter):
     return ", ".join(f"{k} {n}" for k, n in sorted(counter.items())) or "none"
 
@@ -180,7 +174,7 @@ def main():
     for name in SOURCES:
         rows = load(name)
         examples, status = normalize(name, sources[name], rows, to_fields[name])
-        write(examples, INTERIM / f"{name}.jsonl")
+        write_examples(examples, INTERIM / f"{name}.jsonl")
         dropped = Counter({k: n for k, n in status.items() if k != "ok"})
         unsafe = sum(e.gold_safety_label == "unsafe" for e in examples)
         print(

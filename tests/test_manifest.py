@@ -6,7 +6,7 @@ import pytest
 
 from thinkguard.data.keys import prompt_hash
 from thinkguard.data.manifest import MANIFESTS, load_split, write
-from thinkguard.data.schema import Example
+from thinkguard.data.schema import Example, write_examples
 from thinkguard.data.split import PILOT_SIZE, SMOKE_SIZE
 
 ROWS = [
@@ -36,7 +36,7 @@ ROWS = [
 
 def test_written_manifest_loads_and_an_edited_id_raises(tmp_path):
     source = tmp_path / "toy.jsonl"
-    source.write_text("".join(e.to_json() + "\n" for e in ROWS), encoding="utf-8")
+    write_examples(ROWS, source)
     write("toy", source, ROWS[1:4], tmp_path)
     assert load_split("toy", tmp_path) == ROWS[1:4]
 

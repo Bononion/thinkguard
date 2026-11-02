@@ -10,8 +10,8 @@ import json
 from collections import Counter, defaultdict
 from dataclasses import replace
 
-from thinkguard.data.normalize import INTERIM, counts, write
-from thinkguard.data.schema import read_examples
+from thinkguard.data.normalize import INTERIM, counts
+from thinkguard.data.schema import read_examples, write_examples
 from thinkguard.data.sources import TEST_SETS
 from thinkguard.paths import ROOT
 
@@ -88,7 +88,7 @@ def main():
     examples = read_examples(CRITIQUE)
     tests = {name: read_examples(INTERIM / f"{name}.jsonl") for name in TEST_SETS}
     filtered, conflicts = filter_rows(examples, tests)
-    write(filtered, TRAIN_FILTERED)
+    write_examples(filtered, TRAIN_FILTERED)
     LABEL_CONFLICTS.parent.mkdir(parents=True, exist_ok=True)
     with open(LABEL_CONFLICTS, "w", encoding="utf-8", newline="\n") as f:
         f.writelines(json.dumps(c, ensure_ascii=False) + "\n" for c in conflicts)
