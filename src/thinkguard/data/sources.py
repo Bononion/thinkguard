@@ -5,13 +5,13 @@ them on every load. Files are cached by datasets (HF_HOME). huggingface.co reque
 which a source marked gated needs.
 """
 
-from pathlib import Path
-
 import yaml
 from datasets import load_dataset
 
-SOURCES = Path("configs/data/sources.yaml")
-BUILDERS = {"json": "json", "jsonl.gz": "json", "jsonl.xz": "json", "csv": "csv", "parquet": "parquet"}
+from thinkguard.paths import ROOT
+
+SOURCES = ROOT / "configs/data/sources.yaml"
+BUILDERS = {"json": "json", "jsonl.gz": "json", "csv": "csv", "parquet": "parquet"}
 # The test sets every train-test check covers.
 TEST_SETS = ("beavertails_30k_test", "toxicchat_0124_test", "openai_moderation", "wildguardtest")
 
@@ -36,12 +36,15 @@ def url(source):
 
 
 def load(name, path=SOURCES):
-    """One source's rows as dicts, in file order. Raises if rows or unsafe_rows differ from sources.yaml.
+    """One source's rows as dicts, in file order. Raises ValueError if name is not in sources.yaml or rows or
+    unsafe_rows differ from it.
 
     A row is unsafe once if any of its unsafe_fields equals the rule's value. split="train" is only the name datasets
     gives a single data file, whatever the source's split.
     """
-    source = next(s for s in load_sources(path) if s["name"] == name)
+    source = next((s for s in load_sources(path) if s["name"] == name), None)
+    if source is None:
+        raise ValueError(f"source {name!r} is not in {path}")
     rows = load_dataset(BUILDERS[source["format"]], data_files=url(source), split="train").to_list()
     unsafe = sum(is_unsafe(r, source["unsafe"]) for r in rows) if "unsafe" in source else None
     if (len(rows), unsafe) != (source["rows"], source.get("unsafe_rows")):

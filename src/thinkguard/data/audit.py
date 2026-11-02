@@ -1,7 +1,7 @@
-"""Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
+"""Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations.
 
-Run from the repo root: python -m thinkguard.data.audit
-Run order: normalize, filter_train, audit (each as python -m thinkguard.data.<name>).
+Run from the repo root: uv run python -m thinkguard.data.audit
+Run order: normalize, filter_train, audit (each as uv run python -m thinkguard.data.<name>).
 Writes reports/data_audit.md and reports/critique_flags.jsonl (one line per flagged row and reason). The critique and
 benchmark rows come from thinkguard.data.sources.load; the Benchmarks section counts them with the unsafe rules in
 configs/data/sources.yaml. The Training filter section counts data/interim/critique_filtered.jsonl and
@@ -14,47 +14,21 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from itertools import combinations
-from pathlib import Path
 
+from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup, split_pieces
+from thinkguard.data.filter_train import CONFLICT_TYPES, EXCLUSION_REASONS, LABEL_CONFLICTS, TRAIN_FILTERED
 from thinkguard.data.schema import read_examples
-from thinkguard.data.sources import SOURCES, TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
+from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
 from thinkguard.data.split import MIN_PER_CATEGORY, choose_seed, group_split
+from thinkguard.paths import ROOT, rel
 
-REPORT = Path("reports/data_audit.md")
-FLAGS = Path("reports/critique_flags.jsonl")
-TRAIN_FILTERED = Path("data/interim/critique_filtered.jsonl")
-LABEL_CONFLICTS = Path("reports/label_conflicts.jsonl")
-EXCLUSION_REASONS = (  # protocol.md order: first match wins
-    "duplicate",
-    "duplicate_conflict",
-    "teacher_human_conflict",
-    *(f"test_overlap_{name}" for name in TEST_SETS),
-)
-CONFLICT_TYPES = ("teacher_teacher", "teacher_human")
+REPORT = ROOT / "reports/data_audit.md"
+FLAGS = ROOT / "reports/critique_flags.jsonl"
 
-BENCHMARKS = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")
-BENCHMARK_NOTES = (
-    "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
-    (
-        "- OpenAI Moderation is unsafe if any of S, H, V, HR, SH, S3, H2, V2 equals 1. The upstream README gives no"
-        " binary rule; this follows AI2's safety-eval (used for the WildGuard paper), which gives the same 522 positives."
-    ),
-    (
-        "- OpenAI Moderation: 925 rows lack a label for at least one category. Upstream says a missing label means"
-        " unknown; we count it as not flagged, as safety-eval does. No row lacks all 8."
-    ),
-    (
-        "- WildGuardTest: gold label is response_harm_label (provisional; our models classify the agent turn, matching"
-        " safety-eval's wildguardtest_response task). prompt_harm_label is the alternative; final choice in #48."
-    ),
-)
+BENCHMARK_TABLE = ("toxicchat_0124_test", "openai_moderation", "wildguardtest")  # BeaverTails: data/README.md
 
 FIELDS = ("instruction", "input", "output")
-INPUT = re.compile(r"^User: (.*?)\nAgent: (.*)$", re.DOTALL)
-LABEL = re.compile(r"^- Safety Assessment: (safe|unsafe)\b", re.MULTILINE)
 HEADER = re.compile(r"^- (Safety Assessment|Categories|Explanation):", re.MULTILINE)
-CATEGORIES = re.compile(r"^- Categories:(.*)$", re.MULTILINE)
 EXPLANATION = re.compile(r"^- Explanation:(.*)", re.MULTILINE | re.DOTALL)
 HEADER_SEQUENCES = {("Safety Assessment", "Categories", "Explanation"), ("Safety Assessment", "Explanation")}
 TERMINAL = tuple(".!?\"')]")  # an explanation not ending in one of these was cut off
@@ -68,35 +42,6 @@ CONTRADICTION = re.compile(
 )
 
 
-def load_keys(path=SOURCES):
-    """The 14 BeaverTails category keys, as frozen from the 30k_test release into sources.yaml."""
-    return next(s for s in load_sources(path) if s["name"] == "beavertails_30k_test")["dict_keys"]["category"]
-
-
-def split_pieces(value):
-    return [p.strip() for p in value.split(",")]
-
-
-def regroup(value, keys):
-    """Split a Categories value on "," and regroup the pieces left to right by longest match against the keys.
-
-    A key such as "violence,aiding_and_abetting,incitement" contains commas itself. Returns (keys, unknown pieces).
-    """
-    pieces = split_pieces(value)
-    key_pieces = sorted((k.split(",") for k in keys), key=len, reverse=True)
-    found, unknown, i = [], [], 0
-    while i < len(pieces):
-        for kp in key_pieces:
-            if pieces[i : i + len(kp)] == kp:
-                found.append(",".join(kp))
-                i += len(kp)
-                break
-        else:
-            unknown.append(pieces[i])
-            i += 1
-    return found, unknown
-
-
 def audit(rows, keys):
     """Run every check. Returns (stats for the report, sorted flags {row, reason, excerpt})."""
     s = Counter()  # counts of rows per finding
@@ -104,8 +49,7 @@ def audit(rows, keys):
     empty_fields, header_seqs, unknown = Counter(), Counter(), Counter()
     instructions, values, pieces, found = set(), set(), set(), set()
     rows_with = defaultdict(list)  # finding -> rows
-    by_input = defaultdict(list)
-    labels, explanations = [], []
+    explanations = []
     excerpts = {}  # (row, reason) -> excerpt, where it isn't the end of the explanation
 
     for i, r in enumerate(rows):
@@ -117,15 +61,12 @@ def audit(rows, keys):
         inp, out = (v if isinstance(v, str) else "" for v in (fields["input"], fields["output"]))
         if isinstance(fields["instruction"], str):
             instructions.add(fields["instruction"])
-        if inp:
-            by_input[inp].append(i)
         if not INPUT.match(inp):
             s["input_parse_errors"] += 1
             flags.add((i, "parse_error"))
 
         m = LABEL.search(out)
         label = m.group(1) if m else None
-        labels.append(label)
         if label:
             s[label] += 1
         else:
@@ -170,9 +111,6 @@ def audit(rows, keys):
                 rows_with["contradiction"].append(i)
                 excerpts[i, "contradiction"] = text[max(0, other.start() - 100) : other.end() + 100]
 
-    dup_groups = [g for g in by_input.values() if len(g) > 1]
-    conflicts = [(a, b) for g in dup_groups for a, b in combinations(g, 2) if labels[a] != labels[b]]
-    rows_with["conflicting_duplicate"] = sorted({i for pair in conflicts for i in pair})
     for reason, idx in rows_with.items():
         flags.update((i, reason) for i in idx)
 
@@ -184,9 +122,6 @@ def audit(rows, keys):
         "header_sequences": header_seqs,
         "categories": {"pieces": len(pieces), "values": len(values), "keys": sorted(found), "unknown": unknown},
         "rows_with": rows_with,
-        "duplicate_inputs": len(dup_groups),
-        "duplicate_rows": sum(len(g) for g in dup_groups),
-        "conflicts": conflicts,
     }
     flag_rows = [
         {"row": i, "reason": reason, "excerpt": excerpts.get((i, reason), explanations[i][-200:])}
@@ -206,11 +141,10 @@ def render(stats, keys, n_flags, source):
     seqs = "; ".join(f"{' > '.join(seq) or '(none)'}: {n}" for seq, n in sorted(stats["header_sequences"].items()))
     lengths = ", ".join(map(str, stats["instruction_lengths"]))
     unknown = ", ".join(f"`{p}` x{n}" for p, n in sorted(cat["unknown"].items())) or "none"
-    conflicts = ", ".join(f"rows {a} and {b}" for a, b in stats["conflicts"])
     lines = [
         "## Critique release",
         "",
-        f"Source: `{source}`, {stats['rows']} rows. Flagged rows: `{FLAGS.as_posix()}` ({n_flags} lines).",
+        f"Source: `{source}`, {stats['rows']} rows. Flagged rows: `{rel(FLAGS)}` ({n_flags} lines).",
         "",
         "Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.",
         "",
@@ -237,8 +171,6 @@ def render(stats, keys, n_flags, source):
         ),
         f"- Truncated explanations (no terminal `{' '.join(TERMINAL)}`): {rows_list('truncated')}",
         f"- Contradictions (explanation gives a direct verdict for the other label): {rows_list('contradiction')}",
-        f"- Duplicates: {stats['duplicate_inputs']} inputs appear more than once ({stats['duplicate_rows']} rows);"
-        f" {len(stats['conflicts'])} pair(s) with different labels" + (f": {conflicts}" if conflicts else ""),
     ]
     return "\n".join(lines) + "\n"
 
@@ -271,8 +203,8 @@ def render_train_filter(rows, conflicts, tests):
         "## Training filter",
         "",
         (
-            f"Source: `{TRAIN_FILTERED.as_posix()}`, {len(rows)} rows; {reasons[None]} kept."
-            f" Rules: `protocol.md`, Training data filtering. Conflicts: `{LABEL_CONFLICTS.as_posix()}`."
+            f"Source: `{rel(TRAIN_FILTERED)}`, {len(rows)} rows; {reasons[None]} kept."
+            f" Rules: `protocol.md`, Training data filtering. Conflicts: `{rel(LABEL_CONFLICTS)}`."
         ),
         "",
         f"- Duplicates (same pair_hash): {len(groups)} groups ({sum(groups)} rows)",
@@ -302,15 +234,12 @@ def render_split(examples, keys):
     choose_seed picks; keys order the category table.
     """
     seed, failures = choose_seed(examples)
-    sides = dict(zip(("Train", "Validation"), group_split(examples, seed=seed)))
+    sides = dict(zip(("Train", "Validation"), group_split(examples, seed=seed), strict=True))
     rejected = "; ".join(f"seed {s} ({', '.join(f'{c} {n}' for c, n in low.items())})" for s, low in failures.items())
     lines = [
         "## Validation split",
         "",
-        (
-            f"Source: the {len(examples)} kept rows of `{TRAIN_FILTERED.as_posix()}`."
-            " Rules: `protocol.md`, Validation split."
-        ),
+        f"Source: the {len(examples)} kept rows of `{rel(TRAIN_FILTERED)}`. Rules: `protocol.md`, Validation split.",
         "",
         f"- Seed: {seed}. Rejected (a category under {MIN_PER_CATEGORY} validation rows): {rejected or 'none'}",
     ]
@@ -336,14 +265,35 @@ def render_benchmarks(rows, sources):
         "| Benchmark | Gold-label field(s) | Rows | Positives | Missing label cells |",
         "|---|---|---|---|---|",
     ]
-    for name in BENCHMARKS:
+    for name in BENCHMARK_TABLE:
         rule = sources[name]["unsafe"]
         fields = unsafe_fields(rule)
         positives = sum(is_unsafe(r, rule) for r in rows[name])
         missing = sum(r.get(f) is None for r in rows[name] for f in fields)
         gold = ", ".join(f"`{f}`" for f in fields)
         lines.append(f"| `{name}` | {gold} | {len(rows[name])} | {positives} | {missing} |")
-    return "\n".join([*lines, "", *BENCHMARK_NOTES]) + "\n"
+    notes = benchmark_notes(rows["openai_moderation"], sources["openai_moderation"]["unsafe"])
+    return "\n".join([*lines, "", *notes]) + "\n"
+
+
+def benchmark_notes(moderation, rule):
+    """The notes under the Benchmarks table. OpenAI Moderation counts come from its rows; 522 is safety-eval's count,
+    which sources.load already enforces as unsafe_rows.
+    """
+    fields = unsafe_fields(rule)
+    missing = [sum(r.get(f) is None for f in fields) for r in moderation]
+    some, every = sum(n > 0 for n in missing), sum(n == len(fields) for n in missing)
+    lack_all = f"{every} rows lack all {len(fields)}." if every else f"No row lacks all {len(fields)}."
+    return (
+        "- ToxicChat uses toxicchat0124 (newer version; the paper names none; final choice in #48).",
+        f"- OpenAI Moderation is unsafe if any of {', '.join(fields)} equals {rule['equals']}. The upstream README"
+        " gives no binary rule; this follows AI2's safety-eval (used for the WildGuard paper), which gives the same"
+        " 522 positives.",
+        f"- OpenAI Moderation: {some} rows lack a label for at least one category. Upstream says a missing label means"
+        f" unknown; we count it as not flagged, as safety-eval does. {lack_all}",
+        "- WildGuardTest: gold label is response_harm_label (provisional; our models classify the agent turn, matching"
+        " safety-eval's wildguardtest_response task). prompt_harm_label is the alternative; final choice in #48.",
+    )
 
 
 def read_jsonl(path):
@@ -363,7 +313,7 @@ def main():
     sources = {s["name"]: s for s in load_sources()}
     keys = load_keys()
     stats, flags = audit(load("critique"), keys)
-    benchmarks = render_benchmarks({name: load(name) for name in BENCHMARKS}, sources)
+    benchmarks = render_benchmarks({name: load(name) for name in BENCHMARK_TABLE}, sources)
     filtered = read_examples(TRAIN_FILTERED)
     tests = {name: read_examples(TRAIN_FILTERED.parent / f"{name}.jsonl") for name in TEST_SETS}
     train_filter = render_train_filter(filtered, read_jsonl(LABEL_CONFLICTS), tests)

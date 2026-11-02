@@ -48,3 +48,10 @@ def read_examples(path):
     """The Examples of a JSON-lines file, one per line, in file order."""
     with open(path, encoding="utf-8") as f:
         return [Example.from_json(line) for line in f]
+
+
+def write_examples(examples, path):
+    """Write the Examples to path as JSON lines (LF endings), creating its parent directory."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.writelines(e.to_json() + "\n" for e in examples)

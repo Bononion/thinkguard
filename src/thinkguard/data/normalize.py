@@ -1,6 +1,6 @@
 """Normalize every source into Example rows, one JSON line each in data/interim/<source>.jsonl.
 
-Run from the repo root: python -m thinkguard.data.normalize
+Run from the repo root: uv run python -m thinkguard.data.normalize
 Rows that fail to parse are dropped and counted by parse_status. Benchmark gold labels follow each source's unsafe
 rule in configs/data/sources.yaml. Critique rows take their teacher label from the critique and their gold label
 from the beavertails_30k_train annotations of the same pair; neither is ever filled from the other.
@@ -11,15 +11,15 @@ Exits 1 if a benchmark's gold unsafe count differs from its unsafe_rows in sourc
 import sys
 from collections import Counter, defaultdict
 from functools import partial
-from pathlib import Path
 
-from thinkguard.data import audit
+from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup
 from thinkguard.data.keys import pair_hash, prompt_hash
-from thinkguard.data.schema import Example
+from thinkguard.data.schema import Example, write_examples
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields
+from thinkguard.paths import ROOT
 
-GOLD_SPLIT = "beavertails_30k_train"  # the critique release's source split (#42)
-INTERIM = Path("data/interim")
+GOLD_SPLIT = "beavertails_30k_train"  # the critique release's source split (#42, reports/source_match.md)
+INTERIM = ROOT / "data/interim"
 
 
 def missing_text(row, fields):
@@ -92,14 +92,14 @@ def gold_annotations(rows, rule):
 
 def critique(row, keys, gold):
     """Teacher fields parsed from the critique; gold from gold_annotations of the same pair, if they all agree."""
-    m = audit.INPUT.match(row["input"])
+    m = INPUT.match(row["input"])
     if m is None:
         return "input_unparsed"
-    label = audit.LABEL.search(row["output"])
+    label = LABEL.search(row["output"])
     if label is None:
         return "label_unparsed"
-    cats = audit.CATEGORIES.search(row["output"])
-    found, unknown = audit.regroup(cats.group(1).strip(), keys) if cats else ([], [])
+    cats = CATEGORIES.search(row["output"])
+    found, unknown = regroup(cats.group(1).strip(), keys) if cats else ([], [])
     if unknown:
         return "unknown_category"
     prompt, response = m.groups()
@@ -160,12 +160,6 @@ def normalize(name, source, rows, to_fields):
     return examples, status
 
 
-def write(examples, path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.writelines(e.to_json() + "\n" for e in examples)
-
-
 def counts(counter):
     return ", ".join(f"{k} {n}" for k, n in sorted(counter.items())) or "none"
 
@@ -174,13 +168,13 @@ def main():
     sources = {s["name"]: s for s in load_sources()}
     gold = gold_annotations(load(GOLD_SPLIT), sources[GOLD_SPLIT]["unsafe"])
     to_fields = {name: partial(fn, rule=sources[name]["unsafe"]) for name, fn in BENCHMARKS.items()}
-    to_fields["critique"] = partial(critique, keys=audit.load_keys(), gold=gold)
+    to_fields["critique"] = partial(critique, keys=load_keys(), gold=gold)
 
     mismatches = []
     for name in SOURCES:
         rows = load(name)
         examples, status = normalize(name, sources[name], rows, to_fields[name])
-        write(examples, INTERIM / f"{name}.jsonl")
+        write_examples(examples, INTERIM / f"{name}.jsonl")
         dropped = Counter({k: n for k, n in status.items() if k != "ok"})
         unsafe = sum(e.gold_safety_label == "unsafe" for e in examples)
         print(

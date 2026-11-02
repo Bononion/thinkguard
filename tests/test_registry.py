@@ -1,14 +1,11 @@
 """thinkguard.registry on the committed registry and on registries built here."""
 
 import json
-from pathlib import Path
 
 import pytest
 import yaml
 
 from thinkguard.registry import load
-
-ROOT = Path(__file__).parents[1]
 
 
 def entry(id, **fields):
@@ -16,7 +13,7 @@ def entry(id, **fields):
 
 
 def test_committed_registry_has_the_reproduction_conditions():
-    entries = load(ROOT / "configs/experiment_registry.yaml", ROOT / "configs/frozen/source_manifest.json")
+    entries = load()
     assert list(entries) == ["B", "L", "C", "R"]
     assert entries["L"].parent == entries["C"].parent == "B"
     assert {e.decode for e in entries.values()} == {"greedy"}

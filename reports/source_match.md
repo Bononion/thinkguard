@@ -1,5 +1,8 @@
 # Source match
 
+Frozen evidence for `GOLD_SPLIT` in `thinkguard/data/normalize.py`; its one-off generator was deleted after the result
+was fixed.
+
 Critique rows are matched to BeaverTails on `pair_hash` (NFC, whitespace-collapsed prompt and response; `thinkguard/data/keys.py`). Report only: no labels are changed.
 
 | Split | Rows | Distinct pairs | Pairs with >1 annotation | Pairs with conflicting is_safe | 15000 critique rows matched | Match |

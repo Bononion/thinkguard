@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from thinkguard import runs
 from thinkguard.config import config_hash
 from thinkguard.runs import interrupt, start_run
 
@@ -48,12 +49,12 @@ def test_signal_marks_interrupted_with_an_end_time(tmp_path, signum):
 def test_git_dirty_counts_tracked_changes_and_untracked_code(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
-    monkeypatch.chdir(repo)
+    monkeypatch.setattr(runs, "ROOT", repo)  # git -C ROOT reads this repo
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
-    subprocess.run(["git", "init", "-q"], check=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
     (repo / "src/a.py").write_text("a = 1\n", encoding="utf-8")
-    subprocess.run([*git, "add", "src/a.py"], check=True)
-    subprocess.run([*git, "commit", "-qm", "a"], check=True)
+    subprocess.run([*git, "-C", str(repo), "add", "src/a.py"], check=True)
+    subprocess.run([*git, "-C", str(repo), "commit", "-qm", "a"], check=True)
 
     def dirty(seed):
         with start_run("eval", Toy(seed=seed), runs=repo / "runs") as d:

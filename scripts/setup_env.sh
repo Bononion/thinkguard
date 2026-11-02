@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build .venv (Python 3.11) with the pinned HF + PEFT stack and this repo's package. Linux + NVIDIA GPU only.
+# Sync .venv (Python 3.11) from uv.lock with the GPU stack. Linux + NVIDIA GPU only.
 # Run from the repo root: bash scripts/setup_env.sh
 set -euo pipefail
 
@@ -16,12 +16,8 @@ else
   UV="python3 -m uv"
 fi
 
-$UV venv --python 3.11 .venv
-# --python: an active conda env would otherwise take precedence over .venv
-$UV pip install --python .venv/bin/python -r requirements.txt
-$UV pip install --python .venv/bin/python -e .
-
-.venv/bin/python -c "
+$UV sync --locked --group gpu
+$UV run python -c "
 import peft, torch, transformers
 print('torch', torch.__version__)
 print('transformers', transformers.__version__)

@@ -1,6 +1,6 @@
 """Filter the critique rows for training (exact duplicates, label conflicts, test overlap) by the rules in protocol.md.
 
-Run from the repo root, after normalize: python -m thinkguard.data.filter_train
+Run from the repo root, after normalize: uv run python -m thinkguard.data.filter_train
 Writes data/interim/critique_filtered.jsonl (every row in raw order, exclusion_reason set on the excluded ones) and
 reports/label_conflicts.jsonl (one line per conflict), and prints the counts.
 No timestamps, so a rerun is byte-identical.
@@ -10,11 +10,21 @@ import json
 from collections import Counter, defaultdict
 from dataclasses import replace
 
-from thinkguard.data import audit
-from thinkguard.data.normalize import BENCHMARKS, INTERIM, counts, write
-from thinkguard.data.schema import read_examples
+from thinkguard.data.normalize import INTERIM, counts
+from thinkguard.data.schema import read_examples, write_examples
+from thinkguard.data.sources import TEST_SETS
+from thinkguard.paths import ROOT
 
 CRITIQUE = INTERIM / "critique.jsonl"
+TRAIN_FILTERED = INTERIM / "critique_filtered.jsonl"
+LABEL_CONFLICTS = ROOT / "reports/label_conflicts.jsonl"
+EXCLUSION_REASONS = (  # protocol.md order: first match wins
+    "duplicate",
+    "duplicate_conflict",
+    "teacher_human_conflict",
+    *(f"test_overlap_{name}" for name in TEST_SETS),
+)
+CONFLICT_TYPES = ("teacher_teacher", "teacher_human")
 TEST_KEY = {"prompt_response": "pair_hash", "prompt_only": "prompt_hash"}  # a test row's key, by its task_type
 
 
@@ -40,7 +50,7 @@ def conflict(kind, rows, gold=False):
 
 def filter_rows(examples, tests):
     """(examples with exclusion_reason set, conflict lines), by the protocol.md rules. tests maps each test set, in
-    normalize.BENCHMARKS order, to its rows.
+    sources.TEST_SETS order, to its rows.
     """
     groups = defaultdict(list)
     for e in examples:
@@ -70,17 +80,17 @@ def filter_rows(examples, tests):
         overlap = next((name for name, k in test_keys.items() if keys & k), None)
         if overlap:
             reason[e.raw_record_id] = f"test_overlap_{overlap}"
-    filtered =[replace(e, exclusion_reason=reason.get(e.raw_record_id)) for e in examples]
+    filtered = [replace(e, exclusion_reason=reason.get(e.raw_record_id)) for e in examples]
     return filtered, conflicts
 
 
 def main():
     examples = read_examples(CRITIQUE)
-    tests = {name: read_examples(INTERIM / f"{name}.jsonl") for name in BENCHMARKS}
+    tests = {name: read_examples(INTERIM / f"{name}.jsonl") for name in TEST_SETS}
     filtered, conflicts = filter_rows(examples, tests)
-    write(filtered, audit.TRAIN_FILTERED)
-    audit.LABEL_CONFLICTS.parent.mkdir(parents=True, exist_ok=True)
-    with open(audit.LABEL_CONFLICTS, "w", encoding="utf-8", newline="\n") as f:
+    write_examples(filtered, TRAIN_FILTERED)
+    LABEL_CONFLICTS.parent.mkdir(parents=True, exist_ok=True)
+    with open(LABEL_CONFLICTS, "w", encoding="utf-8", newline="\n") as f:
         f.writelines(json.dumps(c, ensure_ascii=False) + "\n" for c in conflicts)
 
     reasons = Counter(e.exclusion_reason for e in filtered)
@@ -89,8 +99,8 @@ def main():
     print(
         f"critique: {len(filtered)} rows, {reasons[None]} kept;"
         f" {len(group_sizes)} duplicate groups ({sum(group_sizes)} rows);"
-        f" conflicts {counts({t: types[t] for t in audit.CONFLICT_TYPES})};"
-        f" exclusions {counts({r: reasons[r] for r in audit.EXCLUSION_REASONS})}"
+        f" conflicts {counts({t: types[t] for t in CONFLICT_TYPES})};"
+        f" exclusions {counts({r: reasons[r] for r in EXCLUSION_REASONS})}"
     )
 
 

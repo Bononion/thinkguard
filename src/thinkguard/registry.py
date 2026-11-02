@@ -1,4 +1,4 @@
-"""The experiment registry (configs/experiment_registry.yaml): the conditions of protocol.md, Conditions, one entry each.
+"""The experiment registry (configs/experiment_registry.yaml): one entry per condition in protocol.md, Conditions.
 
 An entry names its base model by its name in configs/frozen/source_manifest.json, which pins the revision, and the
 entry it is trained from (parent). adapter is the path of the trained LoRA adapter, null until the entry is trained.
@@ -8,14 +8,14 @@ The file is a list, not a mapping keyed by id, so a repeated id is an error inst
 import collections
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
 import yaml
 
 from thinkguard.config import from_dict
+from thinkguard.paths import ROOT
 
-REGISTRY = Path("configs/experiment_registry.yaml")
-SOURCE_MANIFEST = Path("configs/frozen/source_manifest.json")
+REGISTRY = ROOT / "configs/experiment_registry.yaml"
+SOURCE_MANIFEST = ROOT / "configs/frozen/source_manifest.json"
 DECODES = ("greedy", "self_speculative")
 
 

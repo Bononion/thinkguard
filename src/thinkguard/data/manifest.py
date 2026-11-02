@@ -1,6 +1,6 @@
 """Frozen split manifests: the example_ids of each split, so every run trains and scores on the same rows.
 
-Run from the repo root, after filter_train: python -m thinkguard.data.manifest
+Run from the repo root, after filter_train: uv run python -m thinkguard.data.manifest
 Writes data/manifests/<split>.json for train, validation, smoke and pilot (by the rules in protocol.md, Validation
 split) and for test_<set>, every row of each test set in sources.TEST_SETS, and prints each split's row count.
 Each manifest has the split's source file, its ids in source file order and the sha256 of its rows' Example.to_json()
@@ -9,15 +9,15 @@ lines, so load_split notices a changed source. No timestamps, so a rerun is byte
 
 import hashlib
 import json
-from pathlib import Path
 
-from thinkguard.data.audit import TRAIN_FILTERED
+from thinkguard.data.filter_train import TRAIN_FILTERED
 from thinkguard.data.normalize import INTERIM
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS
 from thinkguard.data.split import LONGEST, PILOT_SIZE, SMOKE_SIZE, choose_seed, group_split, subset
+from thinkguard.paths import ROOT, rel
 
-MANIFESTS = Path("data/manifests")
+MANIFESTS = ROOT / "data/manifests"
 
 
 def sha256(examples):
@@ -28,7 +28,7 @@ def sha256(examples):
 def write(split, source, examples, manifests=MANIFESTS):
     manifest = {
         "split": split,
-        "source": source.as_posix(),
+        "source": rel(source),
         "ids": [e.example_id for e in examples],
         "sha256": sha256(examples),
     }
@@ -44,7 +44,7 @@ def load_split(name, manifests=MANIFESTS):
     """
     with open(manifests / f"{name}.json", encoding="utf-8") as f:
         manifest = json.load(f)
-    rows = {e.example_id: e for e in read_examples(manifest["source"])}
+    rows = {e.example_id: e for e in read_examples(ROOT / manifest["source"])}
     missing = [i for i in manifest["ids"] if i not in rows]
     if missing:
         raise ValueError(f"split {name}: {len(missing)} ids not in {manifest['source']}, first {missing[0]}")

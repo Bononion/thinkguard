@@ -5,9 +5,7 @@ data/interim/
 __pycache__/
 *.egg-info/
 
-# Keep the folders in git, not the weights
-checkpoints/*
-!checkpoints/.gitkeep
-runs/**/*.safetensors
-runs/**/*.bin
-runs/**/*.pt
+# Weights never go in git; checkpoint hashes and refs do
+*.safetensors
+*.bin
+*.pt
