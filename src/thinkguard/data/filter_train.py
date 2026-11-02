@@ -70,7 +70,7 @@ def filter_rows(examples, tests):
         overlap = next((name for name, k in test_keys.items() if keys & k), None)
         if overlap:
             reason[e.raw_record_id] = f"test_overlap_{overlap}"
-    filtered =[replace(e, exclusion_reason=reason.get(e.raw_record_id)) for e in examples]
+    filtered = [replace(e, exclusion_reason=reason.get(e.raw_record_id)) for e in examples]
     return filtered, conflicts
 
 

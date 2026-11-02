@@ -1,6 +1,9 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 permissions:
   contents: read
@@ -15,5 +18,6 @@ jobs:
           python-version: "3.11"
       - run: pip install -e . ruff==0.17.1 pytest
       - run: ruff check
+      - run: ruff format --check
       - run: pytest -m "not gpu"
       - run: python -m thinkguard.data.verify_readme --committed-only
