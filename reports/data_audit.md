@@ -2,7 +2,7 @@
 
 ## Critique release
 
-Source: `https://raw.githubusercontent.com/luka-group/ThinkGuard/a7d0c8924a343009e9fd4b31aa84ac845b1ff454/data/beavertails_critiques_aug.json`, 15000 rows. Flagged rows: `reports/critique_flags.jsonl` (8 lines).
+Source: `https://raw.githubusercontent.com/luka-group/ThinkGuard/a7d0c8924a343009e9fd4b31aa84ac845b1ff454/data/beavertails_critiques_aug.json`, 15000 rows. Flagged rows: `reports/critique_flags.jsonl` (6 lines).
 
 Label source: per the ThinkGuard paper, the critics were given the gold BeaverTails label.
 
@@ -16,7 +16,6 @@ Label source: per the ThinkGuard paper, the critics were given the gold BeaverTa
 - Explanation: 0 missing, 0 empty, 0 label-only (under 20 chars)
 - Truncated explanations (no terminal `. ! ? " ' ) ]`): 4 (rows 1324, 3161, 3245, 10557)
 - Contradictions (explanation gives a direct verdict for the other label): 2 (rows 2561, 14857)
-- Duplicates: 18 inputs appear more than once (36 rows); 1 pair(s) with different labels: rows 4774 and 5475
 
 ## Training filter
 

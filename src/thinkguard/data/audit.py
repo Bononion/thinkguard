@@ -1,4 +1,4 @@
-"""Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations, duplicates.
+"""Audit the ThinkGuard critique release: fields, labels, headers, categories, explanations.
 
 Run from the repo root: uv run python -m thinkguard.data.audit
 Run order: normalize, filter_train, audit (each as uv run python -m thinkguard.data.<name>).
@@ -14,7 +14,6 @@ import json
 import re
 import sys
 from collections import Counter, defaultdict
-from itertools import combinations
 
 from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup, split_pieces
 from thinkguard.data.filter_train import CONFLICT_TYPES, EXCLUSION_REASONS, LABEL_CONFLICTS, TRAIN_FILTERED
@@ -50,8 +49,7 @@ def audit(rows, keys):
     empty_fields, header_seqs, unknown = Counter(), Counter(), Counter()
     instructions, values, pieces, found = set(), set(), set(), set()
     rows_with = defaultdict(list)  # finding -> rows
-    by_input = defaultdict(list)
-    labels, explanations = [], []
+    explanations = []
     excerpts = {}  # (row, reason) -> excerpt, where it isn't the end of the explanation
 
     for i, r in enumerate(rows):
@@ -63,15 +61,12 @@ def audit(rows, keys):
         inp, out = (v if isinstance(v, str) else "" for v in (fields["input"], fields["output"]))
         if isinstance(fields["instruction"], str):
             instructions.add(fields["instruction"])
-        if inp:
-            by_input[inp].append(i)
         if not INPUT.match(inp):
             s["input_parse_errors"] += 1
             flags.add((i, "parse_error"))
 
         m = LABEL.search(out)
         label = m.group(1) if m else None
-        labels.append(label)
         if label:
             s[label] += 1
         else:
@@ -116,9 +111,6 @@ def audit(rows, keys):
                 rows_with["contradiction"].append(i)
                 excerpts[i, "contradiction"] = text[max(0, other.start() - 100) : other.end() + 100]
 
-    dup_groups = [g for g in by_input.values() if len(g) > 1]
-    conflicts = [(a, b) for g in dup_groups for a, b in combinations(g, 2) if labels[a] != labels[b]]
-    rows_with["conflicting_duplicate"] = sorted({i for pair in conflicts for i in pair})
     for reason, idx in rows_with.items():
         flags.update((i, reason) for i in idx)
 
@@ -130,9 +122,6 @@ def audit(rows, keys):
         "header_sequences": header_seqs,
         "categories": {"pieces": len(pieces), "values": len(values), "keys": sorted(found), "unknown": unknown},
         "rows_with": rows_with,
-        "duplicate_inputs": len(dup_groups),
-        "duplicate_rows": sum(len(g) for g in dup_groups),
-        "conflicts": conflicts,
     }
     flag_rows = [
         {"row": i, "reason": reason, "excerpt": excerpts.get((i, reason), explanations[i][-200:])}
@@ -152,7 +141,6 @@ def render(stats, keys, n_flags, source):
     seqs = "; ".join(f"{' > '.join(seq) or '(none)'}: {n}" for seq, n in sorted(stats["header_sequences"].items()))
     lengths = ", ".join(map(str, stats["instruction_lengths"]))
     unknown = ", ".join(f"`{p}` x{n}" for p, n in sorted(cat["unknown"].items())) or "none"
-    conflicts = ", ".join(f"rows {a} and {b}" for a, b in stats["conflicts"])
     lines = [
         "## Critique release",
         "",
@@ -183,8 +171,6 @@ def render(stats, keys, n_flags, source):
         ),
         f"- Truncated explanations (no terminal `{' '.join(TERMINAL)}`): {rows_list('truncated')}",
         f"- Contradictions (explanation gives a direct verdict for the other label): {rows_list('contradiction')}",
-        f"- Duplicates: {stats['duplicate_inputs']} inputs appear more than once ({stats['duplicate_rows']} rows);"
-        f" {len(stats['conflicts'])} pair(s) with different labels" + (f": {conflicts}" if conflicts else ""),
     ]
     return "\n".join(lines) + "\n"
 
