@@ -89,6 +89,40 @@ Provide your safety assessment for ONLY THE LAST Agent message in the above conv
 `chat_template` in R's `tokenizer_config.json` (b202736) is byte-identical to Llama Guard 3-8B's (7327bd9), so it is
 inherited from B and says nothing about how R was trained.
 
+## WildGuardTest (Q4)
+
+The `wildguardtest` source (1,725 rows) has 10 columns: `prompt`, `response`, `adversarial`, `prompt_harm_label`,
+`response_refusal_agreement`, `response_refusal_label`, `response_harm_label`, `subcategory`,
+`prompt_harm_agreement`, `response_harm_agreement`. `response` is never null.
+
+Rows by `prompt_harm_label` and `response_harm_label` (null is no annotation):
+
+| prompt \ response | harmful | unharmful | null | total |
+|---|---|---|---|---|
+| harmful | 272 | 477 | 5 | 754 |
+| unharmful | 10 | 930 | 5 | 945 |
+| null | 2 | 18 | 6 | 26 |
+| total | 284 | 1,425 | 16 | 1,725 |
+
+The two labels disagree on 487 rows. Of the 477 harmful prompts with an unharmful response, 360 have
+`response_refusal_label` `refusal` and 117 `compliance`.
+
+The commented-out `wildguardmix` block in `ThinkGuard.py` (a7d0c89) passes the prompt and the response with
+`AgentType.AGENT`, i.e. asks about the response; it has no scoring code and does not run as committed.
+
+Counted with (needs a Hugging Face login with access, `hf auth login` or `HF_TOKEN`):
+
+```
+uv run python -c "
+from collections import Counter
+from thinkguard.data.sources import load
+rows = load('wildguardtest')
+print(Counter((r['prompt_harm_label'], r['response_harm_label']) for r in rows))
+print(Counter(r['response_refusal_label'] for r in rows
+              if (r['prompt_harm_label'], r['response_harm_label']) == ('harmful', 'unharmful')))
+"
+```
+
 ## Open decisions
 
 Proposals as of this evidence; each is decided after the R spike and recorded here.
@@ -98,6 +132,6 @@ Proposals as of this evidence; each is decided after the R spike and recorded he
 | Q1 | Which serialization are L and C trained on: (b) the release in LLaMA-Factory's single user turn, or (c) the model card template? | The way under which R gives the release format with the fewest invalid outputs; (b) on a tie | R spike |
 | Q2 | Is R evaluated with the same prompt contract as B, L and C, including for the harness gate (#13)? | Yes; other R templates may be reported but never replace the contract in the gate | both members |
 | Q3 | For prompt-only benchmarks (ToxicChat, OpenAI Moderation), what fills the Agent slot? | Nothing: the Agent line is dropped, since their labels are about the user input; ToxicChat's `model_output` is not used | both members |
-| Q4 | Which WildGuardTest field is gold? | `response_harm_label`, since the input includes the response; rows where it is null are not scored | value counts, both members |
+| Q4 | Which WildGuardTest field is gold? | `response_harm_label`, already the unsafe rule in `configs/data/sources.yaml`: the input includes the response and the prompt asks about the Agent, so a refusal of a harmful prompt is safe. Its 16 null rows are not scored by the existing rule ([protocol.md](../protocol.md#metrics), scored rows) | WildGuardTest section above, both members |
 | Q5 | Is `- Safety Assessment:` prefilled at inference? | Not for generation, so invalid outputs are measured; the unsafe score is always computed after it | both members |
 | Q6 | Single turn with the decision first, or two chat turns (one reading of the introduction's "two rounds")? | Single turn, as in the release and Eq. 2-7; decision-only inference stops after the decision lines | this evidence; two chat turns (#48's original way (c)) are not run in the R spike |
