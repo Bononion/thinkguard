@@ -79,12 +79,22 @@ output predicts none. Over the 14 BeaverTails categories (`configs/data/sources.
 ### Harness gate (#13)
 
 The paper counts an unsafe prediction as correct only if its categories are also correct (Section 4.2), so its F1 is
-not `unsafe_f1`. #8 implements the paper's scoring per benchmark from the paper and upstream `ThinkGuard.py` as
-`paper_f1`, used only for this gate and for comparisons with the paper's tables, never between our conditions.
+not `unsafe_f1`. `reports/paper_protocol.md` (#8) records how the paper scores each benchmark. `paper_f1` is used only
+for this gate and for comparisons with the paper's tables, never between our conditions:
 
-R passes on a benchmark if `|paper_f1 - paper F1| <= 2.0` percentage points. The gate covers every benchmark #8 marks
-comparable; a benchmark whose paper scoring we cannot match (for example OpenAI Moderation, where upstream
-`ThinkGuard.py` encodes mismatches as `-1`) is reported with its difference but not gated.
+- `beavertails_30k_test`: the F1 of the reading chosen by the rules in `reports/paper_protocol.md`
+  (`thinkguard.evaluation.paper`).
+- `toxicchat_0124_test`, `wildguardtest`: `unsafe_f1`.
+
+The targets are ThinkGuard's Table 1 F1 and Table 3 accuracy in `results/paper_targets.csv`. R passes on a benchmark
+if `|paper_f1 - paper F1| <= 2.0` percentage points; on BeaverTails the chosen reading must also be within 2.0 points
+of the paper's accuracy. The gate covers these three benchmarks and passes when all three pass. OpenAI Moderation,
+whose upstream scoring encodes mismatches as `-1` without saying how they enter F1, is reported with its difference
+but not gated.
+
+Choosing the BeaverTails reading is the one exception to the rule below that nothing is changed to move R toward the
+paper: the four readings are fixed before R runs, only translate R's predictions into the paper's measure (the
+model's outputs do not change), and all four are reported.
 
 ## Selection rules
 
