@@ -7,7 +7,9 @@ below is proposed here.
 
 - 100 Colab compute units (Bononion); the other member's units are not counted yet.
 - Units per hour depend on the GPU and are shown by Colab when the runtime starts; each ledger row records the units
-  its session used.
+  its session used. Measured on Colab Pro: L4 about 1.94 units per hour for one session (2026-11-03), so 100 units is
+  about 51 L4-hours. The first ledger row's 0.44 units include a second session that was open at the same time (3.09
+  units per hour together).
 - The roadmap planned about 56 A100-hours for the whole project. 100 units is a small fraction of that, so the cut
   order below is expected to be used.
 
