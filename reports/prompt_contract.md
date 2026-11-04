@@ -1,8 +1,9 @@
 # Prompt contract
 
 Status: frozen contract (2026-11-04), proposed by Bononion; the other member approves it in the PR review (#48). The
-decisions and the contract are at the end. Sources are pinned in `configs/frozen/source_manifest.json`: the paper (`thinkguard-paper`), the release
-repo (`thinkguard-repo`, a7d0c89) and R (`thinkguard-released`, b202736). Page numbers are the proceedings pages.
+decisions and the contract are at the end. Sources are pinned in `configs/frozen/source_manifest.json`: the paper
+(`thinkguard-paper`), the release repo (`thinkguard-repo`, a7d0c89) and R (`thinkguard-released`, b202736). Page
+numbers are the proceedings pages.
 
 ## Paper
 
@@ -256,3 +257,56 @@ One prompt for training and evaluation, for every condition (B, L, C, R and the 
 - Parser (#52): allows whitespace before `- Safety Assessment:`.
 - Changes: until R's first test-set run (#12), by a commit that updates this section; after it, only as a harness
   gate fix ([protocol.md](../protocol.md#harness-gate-fixes-13)).
+
+## Taxonomies (#49)
+
+Each taxonomy as its pinned source gives it.
+
+BeaverTails: 14 keys, `dict_keys` in `configs/data/sources.yaml`. The release instruction lists display names in the
+same order, one per key; the model reads the names and writes the keys.
+
+| # | Key | Name in the instruction |
+|---|---|---|
+| 1 | `animal_abuse` | Animal Abuse |
+| 2 | `child_abuse` | Child Abuse |
+| 3 | `controversial_topics,politics` | Controversial Topics, Politics |
+| 4 | `discrimination,stereotype,injustice` | Discrimination, Stereotype, Injustice |
+| 5 | `drug_abuse,weapons,banned_substance` | Drug Abuse, Weapons, Banned Substance |
+| 6 | `financial_crime,property_crime,theft` | Financial Crime, Property Crime, Theft |
+| 7 | `hate_speech,offensive_language` | Hate Speech, Offensive Language |
+| 8 | `misinformation_regarding_ethics,laws_and_safety` | Misinformation Regarding Ethics, Laws, and Safety |
+| 9 | `non_violent_unethical_behavior` | Non-Violent Unethical Behavior |
+| 10 | `privacy_violation` | Privacy Violation |
+| 11 | `self_harm` | Self-Harm |
+| 12 | `sexually_explicit,adult_content` | Sexually Explicit, Adult Content |
+| 13 | `terrorism,organized_crime` | Terrorism, Organized Crime |
+| 14 | `violence,aiding_and_abetting,incitement` | Violence, Aiding and Abetting, Incitement |
+
+Llama Guard 3 (B's chat template, 7327bd9; names only): S1 Violent Crimes, S2 Non-Violent Crimes, S3 Sex Crimes,
+S4 Child Exploitation, S5 Defamation, S6 Specialized Advice, S7 Privacy, S8 Intellectual Property, S9 Indiscriminate
+Weapons, S10 Hate, S11 Self-Harm, S12 Sexual Content, S13 Elections, S14 Code Interpreter Abuse.
+
+OpenAI Moderation (README at f4ab51b, which gives a definition for each): `S` sexual, `H` hate, `V` violence,
+`HR` harassment, `SH` self-harm, `S3` sexual/minors, `H2` hate/threatening, `V2` violence/graphic. Each is a binary
+flag; a row is unsafe if any is 1 (`configs/data/sources.yaml`).
+
+ToxicChat: one binary label, `toxicity`; no categories.
+
+WildGuardTest: the binary `response_harm_label` (Q4) and a `subcategory`, never null: `benign` 971,
+`others` 98, `private_information_individual` 81, `social_stereotypes_and_unfair_discrimination` 76,
+`fraud_assisting_illegal_activities` 60, `sensitive_information_organization_government` 50, `cyberattack` 48,
+`mental_health_over-reliance_crisis` 47, `sexual_content` 47, `defamation_encouraging_unethical_or_unsafe_actions` 46,
+`causing_material_harm_by_disseminating_misinformation` 45,
+`disseminating_false_or_misleading_information_encouraging_disinformation_campaigns` 44, `toxic_language_hate_speech`
+41, `violence_and_physical_harm` 40, `copyright_violations` 31. Counted with
+`Counter(r["subcategory"] for r in load("wildguardtest"))` (`thinkguard.data.sources.load`, needs a Hugging Face login).
+
+Decisions:
+
+- No taxonomy is mapped to another. Category metrics are computed on `beavertails_30k_test` only, for every
+  condition, in BeaverTails keys.
+- The keys are `dict_keys` in `configs/data/sources.yaml`, split by `thinkguard.data.critique_format.regroup`, which
+  also returns the pieces that are not keys. The parser (#52) reads them there, so there is no `taxonomy.yaml`.
+- B under its native template (#11, diagnostic) is scored safe/unsafe only, so its S-codes are never mapped.
+- A mapping, if one is ever needed, goes by meaning, never by index: `ThinkGuard.py`'s `LG3Cat` turns BeaverTails
+  category i into S(i+1), which pairs Animal Abuse with Violent Crimes.
