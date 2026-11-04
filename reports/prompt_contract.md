@@ -1,7 +1,7 @@
 # Prompt contract
 
-Status: evidence only. The decisions at the end are made after the R spike (#48); until then nothing here is a
-contract. Sources are pinned in `configs/frozen/source_manifest.json`: the paper (`thinkguard-paper`), the release
+Status: frozen contract (2026-11-04), proposed by Bononion; the other member approves it in the PR review (#48). The
+decisions and the contract are at the end. Sources are pinned in `configs/frozen/source_manifest.json`: the paper (`thinkguard-paper`), the release
 repo (`thinkguard-repo`, a7d0c89) and R (`thinkguard-released`, b202736). Page numbers are the proceedings pages.
 
 ## Paper
@@ -224,15 +224,35 @@ Observations (the decisions are below):
 - Way a's prompt starts with a space (token 220) before `<|begin_of_text|>`, written by Llama Guard 3's chat
   template; it is kept, as the template gives it.
 
-## Open decisions
+## Decisions
 
-Proposals as of this evidence; each is decided after the R spike and recorded here.
-
-| # | Question | Proposal | Decided by |
+| # | Question | Decision | Why |
 |---|---|---|---|
-| Q1 | Which serialization are L and C trained on: (b) the release in LLaMA-Factory's single user turn, or (c) the model card template? | The way under which R gives the release format with the fewest invalid outputs; (b) on a tie | R spike |
-| Q2 | Is R evaluated with the same prompt contract as B, L and C, including for the harness gate (#13)? | Yes; other R templates may be reported but never replace the contract in the gate | both members |
-| Q3 | For prompt-only benchmarks (ToxicChat, OpenAI Moderation), what fills the Agent slot? | Nothing: the Agent line is dropped, since their labels are about the user input; ToxicChat's `model_output` is not used | both members |
-| Q4 | Which WildGuardTest field is gold? | `response_harm_label`, already the unsafe rule in `configs/data/sources.yaml`: the input includes the response and the prompt asks about the Agent, so a refusal of a harmful prompt is safe. Its 16 null rows are not scored by the existing rule ([protocol.md](../protocol.md#metrics), scored rows) | WildGuardTest section above, both members |
-| Q5 | Is `- Safety Assessment:` prefilled at inference? | Not for generation, so invalid outputs are measured; the unsafe score is always computed after it | both members |
-| Q6 | Single turn with the decision first, or two chat turns (one reading of the introduction's "two rounds")? | Single turn, as in the release and Eq. 2-7; decision-only inference stops after the decision lines | this evidence; two chat turns (#48's original way (c)) are not run in the R spike |
+| Q1 | Which serialization are L and C trained on? | Way b: the release in LLaMA-Factory's llama3 user turn | Under a, b and c, R gives the release format on 32/32 rows with no invalid output; the rule written before the spike picks b on a tie |
+| Q2 | Is R evaluated with the same contract as B, L and C, including for the harness gate (#13)? | Yes, and only with it | R gives the release format on 32/32 rows under way b |
+| Q3 | For prompt-only benchmarks (ToxicChat, OpenAI Moderation), what fills the Agent slot? | Nothing: the Agent line is dropped; ToxicChat's `model_output` is not used | Their labels are about the user input; under way b, R keeps the release format on 32/32 prompt-only rows |
+| Q4 | Which WildGuardTest field is gold? | `response_harm_label`; its 16 null rows are not scored | WildGuardTest section above; the scored-rows rule ([protocol.md](../protocol.md#metrics)) |
+| Q5 | Is `- Safety Assessment:` prefilled for generation? | No; it is given only for the unsafe score | Under way b, R starts with it on 32/32 rows; a prefill would hide invalid outputs, which count as wrong, and would help B, which was never trained on this format |
+| Q6 | Single turn with the decision first, or two chat turns? | Single turn, decision first | The release, Eq. 2-7 and every spike output. #48's way (c) was two chat turns, whose second user turn no source gives, so the spike's way c is the model card template instead |
+
+## Contract
+
+One prompt for training and evaluation, for every condition (B, L, C, R and the extension's):
+
+```
+"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n{instruction}\n{input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+```
+
+- `{instruction}`: the release instruction, verbatim (Training data release above), for every benchmark.
+- `{input}`: `User: {prompt}\nAgent: {response}` for `prompt_response` rows (training, `beavertails_30k_test`,
+  `wildguardtest`); `User: {prompt}` for `prompt_only` rows (`toxicchat_0124_test`, `openai_moderation`).
+  `{prompt}` and `{response}` are the raw `user_prompt` and `assistant_response`.
+- Nothing else enters a prompt: no gold label, gold category, teacher label or critique.
+- Targets: C's is `output` + `<|eot_id|>`. L's is `output.split("\n- Explanation:")[0]` + `<|eot_id|>`, the Safety
+  Assessment line and, on unsafe rows, the Categories line (all 15,000 outputs contain `\n- Explanation:` once).
+- Generation: greedy, no prefill. Decision-only generation stops at `\n- Explanation:` or `<|eot_id|>`.
+- Unsafe score: the prompt followed by `- Safety Assessment:` is given; the score is log p(` unsafe`) - log p(` safe`)
+  at the next position, one token each (ids 20451 and 6220).
+- Parser (#52): allows whitespace before `- Safety Assessment:`.
+- Changes: until R's first test-set run (#12), by a commit that updates this section; after it, only as a harness
+  gate fix ([protocol.md](../protocol.md#harness-gate-fixes-13)).
