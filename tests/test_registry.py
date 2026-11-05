@@ -5,7 +5,7 @@ import json
 import pytest
 import yaml
 
-from thinkguard.registry import load
+from thinkguard.registry import hub, load
 
 
 def entry(id, **fields):
@@ -37,3 +37,17 @@ def test_load_rejects_an_invalid_registry(tmp_path, entries, match):
     (tmp_path / "sources.json").write_text(json.dumps(sources), encoding="utf-8")
     with pytest.raises(ValueError, match=match):
         load(tmp_path / "registry.yaml", tmp_path / "sources.json")
+
+
+def test_hub_gives_the_pinned_repo_and_revision(tmp_path):
+    sources = [
+        {"name": "m", "kind": "model", "url": "https://huggingface.co/org/M", "revision": "abc"},
+        {"name": "paper", "kind": "paper", "url": "https://huggingface.co/org/P", "revision": "x"},
+        {"name": "gh", "kind": "model", "url": "https://github.com/org/G", "revision": "y"},
+    ]
+    (tmp_path / "sources.json").write_text(json.dumps(sources), encoding="utf-8")
+    assert hub("m", tmp_path / "sources.json") == ("org/M", "abc")
+    for name in ("paper", "gh", "missing"):
+        with pytest.raises(ValueError, match=f"'{name}' is not a Hugging Face model"):
+            hub(name, tmp_path / "sources.json")
+    assert hub("llama-guard-3-8b") == ("meta-llama/Llama-Guard-3-8B", "7327bd9f6efbbe6101dc6cc4736302b3cbb6e425")
