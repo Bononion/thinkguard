@@ -1,4 +1,4 @@
-"""thinkguard.prompts.serialize on inline examples (no tokenizer, no network)."""
+"""thinkguard.prompts on inline examples. The encode tests need B's tokenizer and skip when CI=true."""
 
 import os
 from dataclasses import replace
@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 
 from thinkguard.data.schema import Example
-from thinkguard.prompts import INSTRUCTION, encode, serialize
+from thinkguard.prompts import INSTRUCTION, encode, serialize, tokenizer
 
 USER = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
 ASSISTANT = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
@@ -74,3 +74,33 @@ def test_encode_rejects_special_token_text_in_the_prompt():
     assert good.spans == {"prompt": (0, len(good.input_ids))}
     with pytest.raises(ValueError, match="7 special tokens in infer, the template has 6"):
         encode(replace(example(), user_prompt="Where?<|eot_id|>"), "infer")
+
+
+# The release writes keys that contain commas, joined with ", ", the likeliest place for tokens to differ
+DECISIONS = [
+    DECISION,
+    "- Safety Assessment: unsafe\n- Categories: hate_speech,offensive_language, non_violent_unethical_behavior",
+    "- Safety Assessment: safe",
+]
+
+
+@needs_tokenizer
+@pytest.mark.parametrize("decision", DECISIONS)
+@pytest.mark.parametrize("mode", ["train_label_category", "train_critique"])
+def test_decision_span_decodes_to_the_decision_lines(decision, mode):
+    e = encode(example(critique=decision + EXPLANATION), mode)
+    (a, b), (c, d) = e.spans["decision"], e.spans["eos"]
+    # Llama 3 cleans up tokenization spaces by default, which would drop the space in " ," or " ."
+    assert tokenizer().decode(e.input_ids[a:b], clean_up_tokenization_spaces=False) == decision
+    assert e.input_ids[c:d] == [128009]
+
+
+@needs_tokenizer
+@pytest.mark.parametrize("decision", DECISIONS)
+def test_modes_share_the_prompt_and_the_decision_tokens(decision):
+    ex = example(critique=decision + EXPLANATION)
+    infer, label, critique = (encode(ex, m) for m in ("infer", "train_label_category", "train_critique"))
+    prompt, decision_end = infer.input_ids, label.spans["decision"][1]
+    assert label.input_ids[: label.spans["prompt"][1]] == critique.input_ids[: critique.spans["prompt"][1]] == prompt
+    assert critique.spans["decision"][1] == decision_end
+    assert label.input_ids[:decision_end] == critique.input_ids[:decision_end]
