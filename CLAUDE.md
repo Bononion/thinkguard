@@ -14,8 +14,9 @@ critique; always named `label_category` in code); C = B + critique LoRA; R = rel
 E-AR / E-SSD = C after early-exit adaptation, decoded greedy vs self-speculative. E-AR and E-SSD are ONE checkpoint,
 two decoding modes. Optional C-FT = C + ordinary continued training.
 
-Only `thinkguard.data` is implemented so far; `prompts`, `evaluation`, `training`, `models`, `decoding` are empty
-packages waiting for P3+.
+Implemented: `thinkguard.data`, `thinkguard.prompts` (the prompt contract: `serialize`, `encode`), the paper's
+BeaverTails scoring (`evaluation/paper.py`), config loading, the experiment registry and run manifests. `training`,
+`models` and `decoding` are empty packages waiting for P4+.
 
 ## Commands
 
@@ -57,7 +58,9 @@ Data pipeline, run from the repo root in this order (each module's docstring say
   rows' content (not just the ids). The four test sets are `sources.TEST_SETS`.
 - **Determinism:** generated files have no timestamps, use `newline="\n"`, and a rerun must be byte-identical.
 - **Test-set firewall (planned, #29/#9):** test splits may only be evaluated from configs under `configs/frozen/`.
-- Tests use tiny inline fixtures and `tmp_path`; a test that hits the network is skipped when `CI=true`.
+- Tests use tiny inline fixtures and `tmp_path`; a test that hits the network is skipped when `CI=true`. The one
+  exception is the tokenizer: B's is gated, so CI sets `THINKGUARD_TOKENIZER=thinkguard-released` and loads R's public
+  one, which gives B's ids and offsets on every train and test row (checked once, in the commit that set it up).
 
 ## Conventions
 

@@ -1,6 +1,6 @@
-"""thinkguard.prompts on inline examples. The encode tests need B's tokenizer and skip when CI=true."""
+"""thinkguard.prompts on inline examples. The encode tests load the tokenizer (R's in CI, see CLAUDE.md)."""
 
-import os
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -58,17 +58,12 @@ def test_train_modes_need_a_critique_with_one_explanation(mode, critique):
         serialize(example(critique=critique), mode)
 
 
-needs_tokenizer = pytest.mark.skipif(os.environ.get("CI") == "true", reason="B's tokenizer is gated")
-
-
-@needs_tokenizer
 def test_encode_rejects_a_span_boundary_inside_a_token():
     # "unsafe " + "\n- Explanation" tokenizes as "unsafe", " \n", ...: the decision would end inside " \n"
     with pytest.raises(ValueError, match="the decision span of train_critique starts or ends inside a token"):
         encode(example(critique="- Safety Assessment: unsafe " + EXPLANATION), "train_critique")
 
 
-@needs_tokenizer
 def test_encode_rejects_special_token_text_in_the_prompt():
     good = encode(example(), "infer")
     assert good.spans == {"prompt": (0, len(good.input_ids))}
@@ -84,7 +79,6 @@ DECISIONS = [
 ]
 
 
-@needs_tokenizer
 @pytest.mark.parametrize("decision", DECISIONS)
 @pytest.mark.parametrize("mode", ["train_label_category", "train_critique"])
 def test_decision_span_decodes_to_the_decision_lines(decision, mode):
@@ -95,7 +89,6 @@ def test_decision_span_decodes_to_the_decision_lines(decision, mode):
     assert e.input_ids[c:d] == [128009]
 
 
-@needs_tokenizer
 @pytest.mark.parametrize("decision", DECISIONS)
 def test_modes_share_the_prompt_and_the_decision_tokens(decision):
     ex = example(critique=decision + EXPLANATION)
@@ -104,3 +97,18 @@ def test_modes_share_the_prompt_and_the_decision_tokens(decision):
     assert label.input_ids[: label.spans["prompt"][1]] == critique.input_ids[: critique.spans["prompt"][1]] == prompt
     assert critique.spans["decision"][1] == decision_end
     assert label.input_ids[:decision_end] == critique.input_ids[:decision_end]
+
+
+@pytest.mark.parametrize(
+    "ex, mode, sha256",
+    [
+        (example(), "train_critique", "4ed1d94a2eb2ee2421648478cc1a7eb1b6aad9c8571929783e2a83771e9df6d7"),
+        (example(), "train_label_category", "ed53f3ac6c1eda22e6c8c5d2c0d555316c8f944826d537b1d1646c97a4d96ff0"),
+        (example(), "infer", "8adc27dac32aacdfbf2c817002905ce5df2e2765308b7a413a2e52805bafac9d"),
+        (example(None, None), "infer", "e433ce5b2fd5c50288e3d3a99c3cc683811f185ce484af361933495c41c1fafe"),
+    ],
+)
+def test_encode_gives_the_pinned_token_ids(ex, mode, sha256):
+    # Fails on a template, BOS/EOS, tokenizer or library change; update the hash only for an intended contract change
+    got = hashlib.sha256(str(encode(ex, mode).input_ids).encode()).hexdigest()
+    assert got == sha256, f"{mode} ids now hash to {got}"

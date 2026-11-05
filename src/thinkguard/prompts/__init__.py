@@ -1,6 +1,7 @@
 """The prompt contract (reports/prompt_contract.md, Contract): one serialization for training and evaluation."""
 
 import functools
+import os
 from dataclasses import dataclass
 
 from transformers import AutoTokenizer
@@ -40,9 +41,10 @@ class Encoded:
 @functools.cache
 def tokenizer():
     """B's tokenizer at the revision pinned in configs/frozen/source_manifest.json. Needs a Hugging Face login with
-    access to the gated repo; loaded once per process.
+    access to the gated repo; loaded once per process. THINKGUARD_TOKENIZER, if set, names another model there to load
+    the tokenizer from: CI sets thinkguard-released, which is public and gives B's ids and offsets on every row.
     """
-    repo, revision = hub(BASE)
+    repo, revision = hub(os.environ.get("THINKGUARD_TOKENIZER", BASE))
     return AutoTokenizer.from_pretrained(repo, revision=revision)
 
 
