@@ -15,7 +15,15 @@ import re
 import sys
 from collections import Counter, defaultdict
 
-from thinkguard.data.critique_format import CATEGORIES, INPUT, LABEL, load_keys, regroup, split_pieces
+from thinkguard.data.critique_format import (
+    CATEGORIES,
+    CONTRADICTION,
+    INPUT,
+    LABEL,
+    load_keys,
+    regroup,
+    split_pieces,
+)
 from thinkguard.data.filter_train import CONFLICT_TYPES, EXCLUSION_REASONS, LABEL_CONFLICTS, TRAIN_FILTERED
 from thinkguard.data.schema import read_examples
 from thinkguard.data.sources import TEST_SETS, is_unsafe, load, load_sources, unsafe_fields, url
@@ -33,13 +41,6 @@ EXPLANATION = re.compile(r"^- Explanation:(.*)", re.MULTILINE | re.DOTALL)
 HEADER_SEQUENCES = {("Safety Assessment", "Categories", "Explanation"), ("Safety Assessment", "Explanation")}
 TERMINAL = tuple(".!?\"')]")  # an explanation not ending in one of these was cut off
 LABEL_ONLY_CHARS = 20  # an explanation shorter than this just restates the label
-# A direct verdict on the conversation, e.g. "The conversation is safe", "The response was classified as **unsafe**"
-CONTRADICTION = re.compile(
-    r"\b(?:conversation|response|interaction|agent'?s? (?:response|reply)|exchange)\s+(?:is|was|has been)\s+"
-    r"(?:(?:correctly\s+|appropriately\s+)?(?:assessed|classified|deemed|rated|labeled|considered)\s+(?:as\s+)?)?"
-    r"\**(safe|unsafe)\**\b",
-    re.IGNORECASE,
-)
 
 
 def audit(rows, keys):
