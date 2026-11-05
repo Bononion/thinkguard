@@ -17,6 +17,7 @@ from thinkguard.paths import ROOT
 REGISTRY = ROOT / "configs/experiment_registry.yaml"
 SOURCE_MANIFEST = ROOT / "configs/frozen/source_manifest.json"
 DECODES = ("greedy", "self_speculative")
+HF = "https://huggingface.co/"
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,17 @@ class Entry:
     parent: str | None
     adapter: str | None
     decode: str
+
+
+def hub(name, sources=SOURCE_MANIFEST):
+    """(repo_id, revision) of the model called name in sources, for from_pretrained. Raises ValueError if name is not
+    a Hugging Face model there.
+    """
+    with open(sources, encoding="utf-8") as f:
+        source = next((s for s in json.load(f) if s["name"] == name and s["kind"] == "model"), None)
+    if source is None or not source["url"].startswith(HF):
+        raise ValueError(f"{name!r} is not a Hugging Face model in {sources}")
+    return source["url"].removeprefix(HF), source["revision"]
 
 
 def load(path=REGISTRY, sources=SOURCE_MANIFEST):
