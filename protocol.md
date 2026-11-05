@@ -3,7 +3,7 @@
 ## Conditions
 
 Checkpoint revisions are pinned in `configs/frozen/source_manifest.json`. Every condition decodes greedily
-(`do_sample=False`) with the same prompt contract (#48).
+(`do_sample=False`) with the same prompt contract ([reports/prompt_contract.md](reports/prompt_contract.md), #48).
 
 | ID | Checkpoint | Decoding | Role |
 |---|---|---|---|
@@ -151,6 +151,11 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
 
 - LoRA, not the paper's full fine-tuning, is a project deviation: C reproduces ThinkGuard's method, not its exact
   weights.
+- Prompt: the paper gives no prompt for the guard. The contract puts the release in LLaMA-Factory's llama3 template,
+  which R's files do not record (assumed).
+- Evaluation prompt: the contract, not `ThinkGuard.py`'s Llama Guard 3 prompt (S1-S14 categories).
+- ToxicChat is prompt-only: `ThinkGuard.py` passes `model_output` too, but the label is about the user input.
+- Prompt-only inputs (ToxicChat, OpenAI Moderation) never occur in training, where every row has a response.
 
 ## Training data filtering
 
