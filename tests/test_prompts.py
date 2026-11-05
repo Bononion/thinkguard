@@ -1,9 +1,12 @@
 """thinkguard.prompts.serialize on inline examples (no tokenizer, no network)."""
 
+import os
+from dataclasses import replace
+
 import pytest
 
 from thinkguard.data.schema import Example
-from thinkguard.prompts import INSTRUCTION, serialize
+from thinkguard.prompts import INSTRUCTION, encode, serialize
 
 USER = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n\n"
 ASSISTANT = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
@@ -53,3 +56,21 @@ def test_modes_share_the_prompt_and_the_decision():
 def test_train_modes_need_a_critique_with_one_explanation(mode, critique):
     with pytest.raises(ValueError, match=r"x:0: train_\w+ needs a critique"):
         serialize(example(critique=critique), mode)
+
+
+needs_tokenizer = pytest.mark.skipif(os.environ.get("CI") == "true", reason="B's tokenizer is gated")
+
+
+@needs_tokenizer
+def test_encode_rejects_a_span_boundary_inside_a_token():
+    # "unsafe " + "\n- Explanation" tokenizes as "unsafe", " \n", ...: the decision would end inside " \n"
+    with pytest.raises(ValueError, match="the decision span of train_critique starts or ends inside a token"):
+        encode(example(critique="- Safety Assessment: unsafe " + EXPLANATION), "train_critique")
+
+
+@needs_tokenizer
+def test_encode_rejects_special_token_text_in_the_prompt():
+    good = encode(example(), "infer")
+    assert good.spans == {"prompt": (0, len(good.input_ids))}
+    with pytest.raises(ValueError, match="7 special tokens in infer, the template has 6"):
+        encode(replace(example(), user_prompt="Where?<|eot_id|>"), "infer")

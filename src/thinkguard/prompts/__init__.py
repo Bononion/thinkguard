@@ -22,12 +22,19 @@ ASSISTANT = "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 EOS = "<|eot_id|>"
 EXPLANATION = "\n- Explanation:"  # every critique has it once; its "\n" starts the explanation
 MODES = ("train_label_category", "train_critique", "infer")
+SPECIAL_IDS = 6  # special tokens in USER and ASSISTANT; train modes add EOS
 
 
 @dataclass(frozen=True)
 class Serialized:
     text: str
     spans: dict[str, tuple[int, int]]  # name -> [start, end) character offsets into text, in text order
+
+
+@dataclass(frozen=True)
+class Encoded:
+    input_ids: list[int]
+    spans: dict[str, tuple[int, int]]  # serialize's spans as [start, end) token indices into input_ids
 
 
 @functools.cache
@@ -48,7 +55,6 @@ def serialize(example, mode):
     - decision: the critique before "\\n- Explanation:" (train modes; the same characters in both)
     - explanation: the rest of the critique, from that "\\n" (train_critique only)
     - eos: the final "<|eot_id|>" (train modes)
-    The text starts with <|begin_of_text|>, so tokenize it with add_special_tokens=False or it gets a second BOS.
     Raises ValueError for an unknown mode, or a train mode on an example whose critique is missing or does not
     contain "\\n- Explanation:" exactly once.
     """
@@ -71,3 +77,27 @@ def serialize(example, mode):
         spans[name] = (start, start + len(piece))
         start += len(piece)
     return Serialized("".join(piece for _, piece in pieces), spans)
+
+
+def encode(example, mode):
+    """serialize(example, mode) as B's token ids, with its spans moved to token indices.
+
+    The text is tokenized whole (BPE can merge across a piece boundary), with add_special_tokens=False: it already
+    starts with <|begin_of_text|>. Raises ValueError if a span boundary falls inside a token, or if the ids hold a
+    special token the template did not put there (special-token text in a prompt, response or critique).
+    """
+    s = serialize(example, mode)
+    tok = tokenizer()
+    enc = tok(s.text, add_special_tokens=False, return_offsets_mapping=True)
+    ids = enc["input_ids"]
+    added = tok.added_tokens_decoder  # a property that rebuilds its dict on every read
+    special, expected = sum(i in added for i in ids), SPECIAL_IDS + (mode != "infer")
+    if special != expected:
+        raise ValueError(f"{example.example_id}: {special} special tokens in {mode}, the template has {expected}")
+    starts = {len(s.text): len(ids)}
+    for k, (a, _) in reversed(list(enumerate(enc["offset_mapping"]))):
+        starts[a] = k  # the first token at a character, if bytes of one character are split over several tokens
+    for name, (a, b) in s.spans.items():
+        if a not in starts or b not in starts:
+            raise ValueError(f"{example.example_id}: the {name} span of {mode} starts or ends inside a token")
+    return Encoded(ids, {name: (starts[a], starts[b]) for name, (a, b) in s.spans.items()})
