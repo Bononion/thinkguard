@@ -2,7 +2,7 @@
 
 import pytest
 
-from thinkguard.evaluation.metrics import safety_metrics
+from thinkguard.evaluation.metrics import category_metrics, flag_rates, safety_metrics
 
 ROWS = [  # (gold, predicted, unsafe_score); predicted None is an invalid output
     ("unsafe", "unsafe", 3.0),  # TP
@@ -37,3 +37,35 @@ def test_all_invalid_outputs_score_zero_and_never_safe():
     assert (m["unsafe_precision"], m["unsafe_recall"], m["unsafe_f1"]) == (0.0, 0.0, 0.0)
     assert (m["coverage"], m["unsafe_f1_valid"]) == (0.0, 0.0)
     assert m["unsafe_auprc"] == 1.0  # the unsafe score is still there: the one unsafe row ranks first
+
+
+A, B = "self_harm", "privacy_violation"
+CATEGORY_ROWS = [  # (gold, gold_categories, predicted, predicted_categories)
+    ("unsafe", {A}, "unsafe", {A}),  # A TP; exact
+    ("unsafe", {A, B}, "unsafe", {A}),  # A TP, B FN
+    ("safe", set(), "unsafe", {B}),  # B FP: a gold-safe row
+    ("unsafe", {B}, None, {B}),  # B FN: an invalid output predicts no category
+    ("unsafe", {A}, "safe", {A}),  # A FN: a safe output predicts no category
+    (None, None, "unsafe", {A}),  # not scored
+    ("unsafe", {A}, "unsafe", {A, "S1"}),  # A TP; not exact, "S1" is not a key
+]
+
+
+def test_category_metrics_by_hand():
+    m = category_metrics(CATEGORY_ROWS)
+    # A: TP 3, FP 0, FN 1, F1 6/7, support 4. B: TP 0, FP 1, FN 2, F1 0, support 2. The other 12 keys: 0.
+    assert m["per_category"][A] == {"f1": pytest.approx(6 / 7), "support": 4}
+    assert m["per_category"][B] == {"f1": 0.0, "support": 2}
+    assert m["category_macro_f1"] == pytest.approx((6 / 7) / 14)  # 3/49
+    assert m["category_exact_match"] == 1 / 5  # 5 gold-unsafe rows, only the first matches exactly
+
+
+def test_flag_rates_over_scored_rows():
+    rows = [("unsafe", {"invalid_label"}), ("safe", {"truncated", "contradiction"}), ("safe", set()), ("unsafe", set())]
+    rows.append((None, {"invalid_label", "truncated"}))  # not scored
+    assert flag_rates(rows) == {
+        "invalid_label_rate": 1 / 4,
+        "unknown_category_rate": 0.0,
+        "contradiction_rate": 1 / 4,
+        "truncated_rate": 1 / 4,
+    }

@@ -60,6 +60,8 @@ only reads these rules.
   - `contradiction`: the explanation gives a direct verdict for the other label (the audit's pattern).
   - `truncated`: the text has no `<|eot_id|>` and does not end at the decision-only stop `\n- Explanation:`, so
     generation hit `max_new_tokens`.
+- `<flag>_rate`, for each of the four flags: scored rows with the flag / scored rows. `invalid_label_rate` is
+  1 - `coverage`. Flag rates are secondary and never replace `unsafe_f1`.
 
 ### Safety label
 
