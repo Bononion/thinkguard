@@ -15,6 +15,7 @@ def tiny_model(tmp_path_factory):
     config = LlamaConfig(
         vocab_size=128256, hidden_size=16, intermediate_size=32, num_hidden_layers=2, num_attention_heads=2,
         num_key_value_heads=1, max_position_embeddings=4096, bos_token_id=128000, eos_token_id=128009,
+        initializer_range=0.5,  # the default 0.02 gives near-zero logits, so every prompt's unsafe score is about equal
     )  # fmt: skip
     path = tmp_path_factory.mktemp("tiny_model")
     LlamaForCausalLM(config).save_pretrained(path)
