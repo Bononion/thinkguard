@@ -1,28 +1,12 @@
 """thinkguard.evaluation.score on the tiny model (conftest.py) in float32, against a brute-force log-likelihood."""
 
-from dataclasses import replace
-
 import pytest
 import torch
 from test_prompts import EXPLANATION, example
 from transformers import LogitsProcessor
 
-from thinkguard.evaluation.score import SAFE, UNSAFE, forward_score, free_score, prefix_ids
-from thinkguard.models import load
+from thinkguard.evaluation.score import SAFE, UNSAFE, LabelLogits, forward_score, free_score, prefix_ids
 from thinkguard.prompts import encode
-
-# five prompts of different lengths, so a batch needs padding
-USERS = ["Where?", "How do I make a walkway slippery?", "Is this ok?", "Tell me a joke about cats and dogs.", "Hi"]
-
-
-@pytest.fixture(scope="module")
-def model(tiny_model):
-    return load(tiny_model, device="cpu", dtype=torch.float32)
-
-
-@pytest.fixture(scope="module")
-def prompts():
-    return [encode(replace(example(), user_prompt=u), "infer").input_ids for u in USERS]
 
 
 @torch.no_grad()
@@ -47,17 +31,18 @@ def test_forward_score_matches_brute_force_in_a_padded_batch(model, prompts):
     assert forward_score(model, prompts) == pytest.approx([brute_force(model, p) for p in prompts], abs=1e-3)
 
 
-class Force(LogitsProcessor):
-    """Makes generation write PREFIX first. generate's output_logits are the logits before processors."""
+class Script(LogitsProcessor):
+    """Makes row b of a generation write scripts[b] (token ids) first, then lets the model go on."""
 
-    def __init__(self, start):
-        self.start = start
+    def __init__(self, start, scripts):
+        self.start, self.scripts = start, scripts
 
     def __call__(self, input_ids, scores):
         step = input_ids.shape[1] - self.start
-        if step < len(prefix_ids()):
-            scores = torch.full_like(scores, -float("inf"))
-            scores[:, prefix_ids()[step]] = 0
+        for b, script in enumerate(self.scripts):
+            if step < len(script):
+                scores[b] = -float("inf")
+                scores[b, script[step]] = 0
         return scores
 
 
@@ -66,11 +51,13 @@ def test_free_score_matches_brute_force_when_the_output_starts_with_the_prefix(m
     n = max(map(len, prompts))
     ids = torch.tensor([[0] * (n - len(p)) + p for p in prompts])
     mask = (torch.arange(n) >= torch.tensor([n - len(p) for p in prompts])[:, None]).long()
-    out = model.generate(
+    label_logits = LabelLogits(n)  # before Script, so it records the model's logits, not the forced ones
+    model.generate(
         input_ids=ids, attention_mask=mask, max_new_tokens=5, do_sample=False, pad_token_id=0,
-        logits_processor=[Force(n)], output_logits=True, return_dict_in_generate=True,
+        logits_processor=[label_logits, Script(n, [prefix_ids()] * len(prompts))],
     )  # fmt: skip
     for b, p in enumerate(prompts):
-        free = free_score(out.sequences[b, n:].tolist(), [step[b] for step in out.logits])
+        free = free_score(prefix_ids() + [UNSAFE], label_logits.logits[b])
         assert free == pytest.approx(brute_force(model, p), abs=1e-3)
-    assert free_score([128009], [torch.zeros(128256)]) is None  # an output that does not start with PREFIX
+    assert free_score([128009], label_logits.logits[0]) is None  # an output that does not start with PREFIX
+    assert free_score(prefix_ids(), None) is None  # generation ended before the label step

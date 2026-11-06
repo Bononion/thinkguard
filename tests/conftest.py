@@ -18,5 +18,29 @@ def tiny_model(tmp_path_factory):
         initializer_range=0.5,  # the default 0.02 gives near-zero logits, so every prompt's unsafe score is about equal
     )  # fmt: skip
     path = tmp_path_factory.mktemp("tiny_model")
-    LlamaForCausalLM(config).save_pretrained(path)
+    model = LlamaForCausalLM(config)
+    model.generation_config.eos_token_id = [128001, 128008, 128009]  # as in B's and R's generation_config.json
+    model.save_pretrained(path)
     return path
+
+
+@pytest.fixture(scope="session")
+def model(tiny_model):
+    """The tiny model loaded by thinkguard.models.load, on CPU in float32."""
+    torch = pytest.importorskip("torch")
+    from thinkguard.models import load
+
+    return load(tiny_model, device="cpu", dtype=torch.float32)
+
+
+@pytest.fixture(scope="session")
+def prompts():
+    """Five infer prompts (token ids) of different lengths, so a batch of them needs padding."""
+    from dataclasses import replace
+
+    from test_prompts import example
+
+    from thinkguard.prompts import encode
+
+    users = ["Where?", "How do I make a walkway slippery?", "Is this ok?", "Tell me a joke about cats and dogs.", "Hi"]
+    return [encode(replace(example(), user_prompt=u), "infer").input_ids for u in users]

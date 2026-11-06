@@ -5,13 +5,14 @@ log p(" unsafe") - log p(" safe"): both share the softmax normaliser. With B's t
 (UNSAFE, SAFE) and the two differ, so no sum over label tokens is needed.
 
 Two paths give the same number. free_score: when a model's own first generated tokens are PREFIX, as R, L and C write
-the release format, the next generation step's logits are the ones the score needs, at no cost. forward_score: for any
-other output, as B's, one forward over the prompt and PREFIX.
+the release format, the next generation step's logits are the ones the score needs, recorded by LabelLogits at no
+cost. forward_score: for any other output, as B's, one forward over the prompt and PREFIX.
 """
 
 import functools
 
 import torch
+from transformers import LogitsProcessor
 
 from thinkguard.prompts import tokenizer
 
@@ -24,15 +25,28 @@ def prefix_ids():
     return tokenizer().encode(PREFIX, add_special_tokens=False)
 
 
-def free_score(generated, step_logits):
-    """The score of one generated sequence, or None if it does not start with PREFIX's ids. generated is its generated
-    ids (prompt excluded); step_logits[i] is the vocab logits of generation step i, which predicts generated[i].
+class LabelLogits(LogitsProcessor):
+    """Records each row's (UNSAFE, SAFE) logits at the generation step right after PREFIX's length, and changes
+    nothing. It must come before any processor that changes the scores, so it sees the model's logits. logits stays
+    None if generation ends before that step.
     """
-    p = prefix_ids()
-    if list(generated[: len(p)]) != p or len(step_logits) <= len(p):
+
+    def __init__(self, prompt_len):
+        self.prompt_len, self.logits = prompt_len, None
+
+    def __call__(self, input_ids, scores):
+        if input_ids.shape[1] - self.prompt_len == len(prefix_ids()):
+            self.logits = scores[:, [UNSAFE, SAFE]].float().cpu()
+        return scores
+
+
+def free_score(generated, label_logits):
+    """The score of one generated sequence, or None if it does not start with PREFIX's ids or label_logits is None.
+    generated is its generated ids (prompt excluded); label_logits its row of LabelLogits.logits.
+    """
+    if label_logits is None or list(generated[: len(prefix_ids())]) != prefix_ids():
         return None
-    x = step_logits[len(p)].float()
-    return (x[UNSAFE] - x[SAFE]).item()
+    return (label_logits[0] - label_logits[1]).item()
 
 
 @torch.no_grad()
