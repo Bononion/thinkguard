@@ -1,11 +1,17 @@
 """thinkguard.evaluation.generate on the tiny model (conftest.py) in float32, with outputs forced by Script."""
 
+import json
+
 import pytest
 from test_score import Script
 
-from thinkguard.evaluation.generate import EOS_ID, batches, generate, generate_batch
+from thinkguard.evaluate import EvalConfig
+from thinkguard.evaluation import generate
+from thinkguard.evaluation.generate import EOS_ID, batches, generate_batch, predict
 from thinkguard.evaluation.score import forward_score
 from thinkguard.prompts import tokenizer
+
+IDS = [f"e{i}" for i in range(5)]  # the example ids of the prompts fixture
 
 
 def ids(text):
@@ -23,10 +29,44 @@ def test_batches_are_fixed_by_the_whole_list_and_stable():
     assert batches([[0] * 3, [0], [0] * 3, [0] * 2, [0]], 2) == [[1, 4], [3, 0], [2]]
 
 
-def test_batched_generation_equals_one_prompt_at_a_time(model, prompts):
-    one_by_one = generate(model, prompts, "explanation", max_new_tokens=6, batch_size=1)
-    batched = generate(model, prompts, "explanation", max_new_tokens=6, batch_size=2)  # sorted, padded batches
-    assert [r["generated_ids"] for r in batched] == [r["generated_ids"] for r in one_by_one]
+def config(**changes):
+    fields = {"condition": "R", "split": "smoke", "mode": "explanation", "max_new_tokens": 6, "batch_size": 2}
+    return EvalConfig(**fields | changes)
+
+
+def generated(path):
+    rows = map(json.loads, path.read_text(encoding="utf-8").splitlines())
+    return {r["example_id"]: r["generated_ids"] for r in rows}
+
+
+def test_batched_generation_equals_one_prompt_at_a_time(model, prompts, tmp_path):
+    for size in (1, 2):  # batches of 2 are sorted and padded
+        predict(model, IDS, prompts, config(batch_size=size), tmp_path / f"{size}.jsonl")
+    assert generated(tmp_path / "2.jsonl") == generated(tmp_path / "1.jsonl")
+
+
+@pytest.mark.parametrize("tail", [0, 10])  # batch 1 cut after its first row, or inside its second
+def test_a_resumed_run_redoes_only_the_cut_batch_and_writes_the_same_bytes(model, prompts, tmp_path, monkeypatch, tail):
+    full, cut = tmp_path / "full.jsonl", tmp_path / "cut.jsonl"
+    predict(model, IDS, prompts, config(), full)
+    lines = full.read_bytes().splitlines(keepends=True)  # batches of 2, 2 and 1 rows
+    cut.write_bytes(b"".join(lines[:3]) + lines[3][:tail])
+    sizes, real = [], generate.generate_batch
+    monkeypatch.setattr(generate, "generate_batch", lambda m, p, *a: sizes.append(len(p)) or real(m, p, *a))
+    predict(model, IDS, prompts, config(), cut)
+    assert cut.read_bytes() == full.read_bytes()
+    assert sizes == [2, 1]  # batches 1 and 2 only
+
+
+@pytest.mark.parametrize("other", ["config", "example_ids"])
+def test_a_file_from_another_run_raises_and_stays_as_it_was(model, prompts, tmp_path, other):
+    path = tmp_path / "p.jsonl"
+    predict(model, IDS, prompts, config(), path)
+    before = path.read_bytes()
+    args = (IDS, config(max_new_tokens=5)) if other == "config" else (IDS[::-1], config())
+    with pytest.raises(ValueError, match="another run"):
+        predict(model, args[0], prompts, args[1], path)
+    assert path.read_bytes() == before
 
 
 DECISION = "- Safety Assessment: unsafe\n- Categories: self_harm"
@@ -40,7 +80,6 @@ def test_decision_mode_stops_after_the_explanation_header(model, prompts, mode):
         assert r["text"] == f"{DECISION}\n- Explanation:"
     else:
         assert r["text"].startswith(f"{DECISION}\n- Explanation: It is harmful.")
-    assert r["n_generated"] == len(r["generated_ids"])
 
 
 def test_a_row_that_stops_early_keeps_no_padding(model, prompts):
@@ -50,7 +89,7 @@ def test_a_row_that_stops_early_keeps_no_padding(model, prompts):
     a, b, c = run(model, prompts[:3], [stop, eos, long], "decision", max_new_tokens=len(long))
     assert a["text"] == f"{DECISION}\n- Explanation:" and EOS_ID not in a["generated_ids"]
     assert b["generated_ids"] == eos  # one EOS, the model's own
-    assert c["n_generated"] == len(long)
+    assert len(c["generated_ids"]) == len(long)
 
 
 def test_each_row_gets_the_free_or_the_forward_score(model, prompts):

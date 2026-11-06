@@ -1,13 +1,19 @@
 """Greedy generation on prompts (token ids, as encode(..., "infer") gives) in fixed batches, with the unsafe score.
 
-Batches depend only on the whole list of prompts, so a resumed run (#9) that skips finished batches gets the same
-batches, and in bf16 the same outputs. Generation uses a fresh GenerationConfig: B's and R's generation_config.json
-also stop at 128001 and 128008, while the contract stops only at <|eot_id|>.
+predict writes one JSON line per prompt, batch by batch, and a rerun on the same file goes on after the last complete
+batch. Batches depend only on the whole list of prompts, so the rerun gets the same batches, and in bf16 the same
+outputs. Generation uses a fresh GenerationConfig: B's and R's generation_config.json also stop at 128001 and 128008,
+while the contract stops only at <|eot_id|>.
 """
+
+import json
+import os
+from pathlib import Path
 
 import torch
 from transformers import GenerationConfig
 
+from thinkguard.config import config_hash
 from thinkguard.evaluation.score import LabelLogits, forward_score, free_score
 from thinkguard.prompts import EXPLANATION, tokenizer
 
@@ -25,6 +31,8 @@ def batches(prompts, size):
 def trim(ids, mode):
     """The generated ids up to whichever comes first: the first <|eot_id|> (kept), or in decision mode the token that
     completes "\\n- Explanation:". What generate pads after it, <|eot_id|> too, is dropped.
+    ponytail: an output that starts with "- Explanation:" stops on the prompt's last "\\n" but is not cut here, so it
+    keeps one padding <|eot_id|>; it has no label line anyway, so parse marks it invalid.
     """
     end = ids.index(EOS_ID) + 1 if EOS_ID in ids else len(ids)
     if mode == "decision":
@@ -35,8 +43,8 @@ def trim(ids, mode):
 
 @torch.no_grad()
 def generate_batch(model, prompts, mode, max_new_tokens, processors=()):
-    """One record per prompt, in order: {generated_ids, text, n_generated, unsafe_score, score_path}. text keeps
-    special tokens and tokenization spaces. score_path is "free" (LabelLogits during generation) or "forward" (one
+    """One record per prompt, in order: {generated_ids, text, unsafe_score, score_path}. text keeps special tokens
+    and tokenization spaces. score_path is "free" (LabelLogits during generation) or "forward" (one
     extra batched forward for the rows whose output does not start with the prefix). processors run after
     LabelLogits (tests use them to force outputs).
     """
@@ -60,16 +68,50 @@ def generate_batch(model, prompts, mode, max_new_tokens, processors=()):
         scores[b] = s
     decode = tokenizer().decode
     return [
-        {"generated_ids": g, "text": decode(g, clean_up_tokenization_spaces=False), "n_generated": len(g),
-         "unsafe_score": scores[b], "score_path": "forward" if b in forward else "free"}
+        {"generated_ids": g, "text": decode(g, clean_up_tokenization_spaces=False), "unsafe_score": scores[b],
+         "score_path": "forward" if b in forward else "free"}
         for b, g in enumerate(generated)
     ]  # fmt: skip
 
 
-def generate(model, prompts, mode, max_new_tokens, batch_size):
-    """generate_batch over batches(prompts, batch_size); one record per prompt, in the prompts' order."""
-    records = [None] * len(prompts)
-    for batch in batches(prompts, batch_size):
-        for i, r in zip(batch, generate_batch(model, [prompts[i] for i in batch], mode, max_new_tokens), strict=True):
-            records[i] = r
-    return records
+def done_batches(path, plan, example_ids, h):
+    """How many batches of plan path holds in full, from the first; what follows them (a batch cut short by a crash)
+    is cut off. Raises ValueError, before changing path, for a row of another run: another config_hash, or a batch
+    whose example ids are not plan's.
+    """
+    if not path.exists():
+        return 0
+    lines = path.read_bytes().splitlines(keepends=True)
+    k = i = end = 0
+    while k < len(plan) and i + len(plan[k]) <= len(lines):
+        chunk = lines[i : i + len(plan[k])]
+        if not chunk[-1].endswith(b"\n"):  # the last line was cut mid-write
+            break
+        rows = [json.loads(line) for line in chunk]
+        same_config = all(r["config_hash"] == h for r in rows)
+        same_ids = [r["example_id"] for r in rows] == [example_ids[j] for j in plan[k]]
+        if not (same_config and same_ids):
+            raise ValueError(f"{path}: batch {k} is from another run")
+        i, k, end = i + len(chunk), k + 1, end + sum(map(len, chunk))
+    with open(path, "r+b") as f:
+        f.truncate(end)
+    return k
+
+
+def predict(model, example_ids, prompts, config, path):
+    """Appends to path one JSON line per prompt, {example_id, batch, config_hash, **generate_batch's record}, for each
+    batch of batches(prompts, config.batch_size) that path does not hold in full yet (done_batches), in batch order.
+    Each batch is one write, flushed and fsynced, so an interrupted run loses at most the batch it was on.
+    """
+    path, plan, h = Path(path), batches(prompts, config.batch_size), config_hash(config)
+    start = done_batches(path, plan, example_ids, h)
+    with open(path, "a", encoding="utf-8", newline="\n") as f:
+        for k in range(start, len(plan)):
+            records = generate_batch(model, [prompts[i] for i in plan[k]], config.mode, config.max_new_tokens)
+            rows = (
+                {"example_id": example_ids[i], "batch": k, "config_hash": h, **r}
+                for i, r in zip(plan[k], records, strict=True)
+            )
+            f.write("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows))
+            f.flush()
+            os.fsync(f.fileno())
