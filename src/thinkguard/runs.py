@@ -15,15 +15,17 @@ import datetime
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import signal
 import subprocess
+from pathlib import Path
 
 from thinkguard.config import config_hash
 from thinkguard.data.manifest import MANIFESTS
 from thinkguard.paths import ROOT
 
-RUNS = ROOT / "runs"
+RUNS = Path(os.environ.get("THINKGUARD_RUNS", ROOT / "runs"))  # point it at persistent storage on Colab
 CODE = ("src", "configs", "scripts")  # an untracked file here can change what a run does
 
 

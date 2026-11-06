@@ -128,7 +128,9 @@ rows), never a test set.
 ### Test-set firewall
 
 - `thinkguard.evaluate` (#9) exits with an error on a split whose name starts with `test_` unless the config file is
-  under `configs/frozen/` and committed: `git status --porcelain <config>` prints nothing.
+  under `configs/frozen/` and committed unchanged: git tracks it (`git ls-files --error-unmatch <config>` succeeds)
+  and `git status --porcelain <config>` prints nothing. The first check catches an ignored file, which `git status`
+  does not print.
 - The run manifest (#33) records the git commit and the config hash, so every test number traces to a committed
   frozen config.
 - A frozen config is never edited after its first test run. A change is a new file, and both runs are reported.
