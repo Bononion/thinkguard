@@ -1,0 +1,6 @@
+# R on the smoke split (32 train rows), to check the evaluate command end to end. Not a reported number.
+condition: R
+split: smoke
+mode: explanation
+max_new_tokens: 256  # until #51 fixes the max length
+batch_size: 16

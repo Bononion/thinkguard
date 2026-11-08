@@ -4,6 +4,7 @@ import subprocess
 
 import pytest
 
+from thinkguard import evaluate, runs
 from thinkguard.evaluate import EvalConfig, check_firewall
 
 
@@ -41,9 +42,25 @@ def test_firewall_blocks_a_test_split_without_a_committed_frozen_config(frozen, 
         check_firewall(frozen / name, "test_wildguardtest", frozen)
 
 
-def test_firewall_lets_a_committed_frozen_config_and_other_splits_through(frozen):
+def test_firewall_lets_a_committed_frozen_config_and_other_splits_through(frozen, monkeypatch):
+    monkeypatch.setattr(runs, "dirty", lambda: False)
     check_firewall(frozen / "ok.yaml", "test_wildguardtest", frozen)
     check_firewall(frozen.parent / "outside.yaml", "smoke", frozen)
+
+
+def test_firewall_blocks_a_test_split_on_uncommitted_code(frozen, monkeypatch):
+    monkeypatch.setattr(runs, "dirty", lambda: True)
+    with pytest.raises(ValueError, match="needs committed code"):
+        check_firewall(frozen / "ok.yaml", "test_wildguardtest", frozen)
+    check_firewall(frozen / "ok.yaml", "smoke", frozen)  # only test splits
+
+
+def test_evaluate_exits_on_a_test_split_before_reading_data(tmp_path, monkeypatch):
+    config = tmp_path / "x.yaml"
+    config.write_text("condition: R\nsplit: test_wildguardtest\nmode: decision\nmax_new_tokens: 8\nbatch_size: 4\n")
+    monkeypatch.setattr(evaluate, "load_split", lambda name: pytest.fail("read the split before the firewall"))
+    with pytest.raises(ValueError, match="needs a config under"):
+        evaluate.main(["--config", str(config)])
 
 
 GOOD = {"condition": "R", "split": "smoke", "mode": "decision", "max_new_tokens": 32, "batch_size": 16}
