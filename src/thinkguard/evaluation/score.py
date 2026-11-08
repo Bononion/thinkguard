@@ -7,6 +7,11 @@ log p(" unsafe") - log p(" safe"): both share the softmax normaliser. With B's t
 Two paths give the same number. free_score: when a model's own first generated tokens are PREFIX, as R, L and C write
 the release format, the next generation step's logits are the ones the score needs, recorded by LabelLogits at no
 cost. forward_score: for any other output, as B's, one forward over the prompt and PREFIX.
+
+Measured with R on smoke (tests/test_gpu_eval.py, L4, bf16, torch 2.8.0, transformers 4.57.1): 32/32 rows took the
+free path, and the largest |free - forward| was 0.125. The two paths differ in bf16 rounding only (batch padding, KV
+cache), well under the whole units a wrong token or position gives, so B's forward scores and R's free scores are on
+one scale.
 """
 
 import functools
