@@ -1,10 +1,18 @@
-"""thinkguard.report.score_run on four hand-made rows: matching by id, which metrics it adds, what it refuses."""
+"""thinkguard.report on four hand-made rows: score_run (matching by id, which metrics, what it refuses) and the
+scores command (byte-identical CSV, one run per condition, split and mode, no torch).
+"""
 
+import csv
+import io
+import json
+import subprocess
+import sys
 from dataclasses import replace
 
 import pytest
 from test_prompts import example
 
+from thinkguard import report
 from thinkguard.report import score_run
 
 UNSAFE = "- Safety Assessment: unsafe"
@@ -50,3 +58,49 @@ def test_score_run_rejects(change, match):
     change(manifest, predictions)
     with pytest.raises(ValueError, match=match):
         score_run(manifest, predictions, EXAMPLES)
+
+
+@pytest.fixture
+def scores(tmp_path, monkeypatch):
+    """report.main with runs and results in tmp_path and EXAMPLES for every split; returns (main, write_run)."""
+    monkeypatch.setattr(report, "RUNS", tmp_path / "runs")
+    monkeypatch.setattr(report, "RESULTS", tmp_path)
+    monkeypatch.setattr(report, "load_split", lambda name: EXAMPLES)
+
+    def write_run(run_id, split):
+        manifest, predictions = run(split)
+        d = tmp_path / "runs" / run_id
+        d.mkdir(parents=True)
+        (d / "manifest.json").write_text(json.dumps(manifest | {"run_id": run_id}), encoding="utf-8")
+        (d / "predictions.jsonl").write_text("".join(json.dumps(p) + "\n" for p in predictions), encoding="utf-8")
+
+    return lambda *ids: report.main(["scores", "--runs", *ids]), write_run
+
+
+def test_scores_csv_is_the_same_bytes_whatever_the_order_of_runs(scores, tmp_path):
+    main, write_run = scores
+    write_run("r1", "test_beavertails_30k_test")
+    write_run("r2", "test_toxicchat_0124_test")
+    main("r1", "r2")
+    first = (tmp_path / "scores.csv").read_bytes()
+    main("r2", "r1")
+    assert (tmp_path / "scores.csv").read_bytes() == first
+    rows = list(csv.DictReader(io.StringIO(first.decode("utf-8"))))
+    assert {(r["run_id"], r["config_hash"], r["value"]) for r in rows if r["metric"] == "unsafe_f1"} == {
+        ("r1", "h", "0.5"),
+        ("r2", "h", "0.5"),
+    }
+
+
+def test_scores_refuses_two_runs_of_one_condition_split_and_mode(scores, tmp_path):
+    main, write_run = scores
+    write_run("r1", "smoke")
+    write_run("r2", "smoke")
+    with pytest.raises(ValueError, match="more than one run"):
+        main("r1", "r2")
+    assert not (tmp_path / "scores.csv").exists()
+
+
+def test_report_does_not_import_torch():  # so the tables can be rebuilt without the model weights
+    check = "import sys, thinkguard.report; assert 'torch' not in sys.modules, 'torch imported'"
+    subprocess.run([sys.executable, "-c", check], check=True)
