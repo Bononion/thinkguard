@@ -1,4 +1,6 @@
-"""Parse the critique release's text: the User/Agent input, the safety label line and the categories line."""
+"""Parse the critique release's text: the User/Agent input, the safety label line, the categories line and verdicts
+inside an explanation.
+"""
 
 import re
 
@@ -7,6 +9,13 @@ from thinkguard.data.sources import SOURCES, load_sources
 INPUT = re.compile(r"^User: (.*?)\nAgent: (.*)$", re.DOTALL)
 LABEL = re.compile(r"^- Safety Assessment: (safe|unsafe)\b", re.MULTILINE)
 CATEGORIES = re.compile(r"^- Categories:(.*)$", re.MULTILINE)
+# A direct verdict on the conversation, e.g. "The conversation is safe", "The response was classified as **unsafe**"
+CONTRADICTION = re.compile(
+    r"\b(?:conversation|response|interaction|agent'?s? (?:response|reply)|exchange)\s+(?:is|was|has been)\s+"
+    r"(?:(?:correctly\s+|appropriately\s+)?(?:assessed|classified|deemed|rated|labeled|considered)\s+(?:as\s+)?)?"
+    r"\**(safe|unsafe)\**\b",
+    re.IGNORECASE,
+)
 
 
 def load_keys(path=SOURCES):

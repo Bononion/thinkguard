@@ -895,6 +895,7 @@ dependencies = [
     { name = "datasets" },
     { name = "pyarrow" },
     { name = "pyyaml" },
+    { name = "scikit-learn" },
     { name = "transformers" },
 ]
 
@@ -906,7 +907,6 @@ dev = [
 gpu = [
     { name = "accelerate" },
     { name = "peft" },
-    { name = "scikit-learn" },
     { name = "torch" },
 ]
 
@@ -915,6 +915,7 @@ requires-dist = [
     { name = "datasets", specifier = "==4.0.0" },
     { name = "pyarrow", specifier = "==26.0.0" },
     { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "scikit-learn", specifier = "==1.9.1" },
     { name = "transformers", specifier = "==4.57.1" },
 ]
 
@@ -926,7 +927,6 @@ dev = [
 gpu = [
     { name = "accelerate", specifier = "==1.11.0" },
     { name = "peft", specifier = "==0.18.1" },
-    { name = "scikit-learn", specifier = "==1.9.1" },
     { name = "torch", specifier = "==2.8.0" },
 ]
 
