@@ -15,8 +15,9 @@ E-AR / E-SSD = C after early-exit adaptation, decoded greedy vs self-speculative
 two decoding modes. Optional C-FT = C + ordinary continued training.
 
 Implemented: `thinkguard.data`, `thinkguard.prompts` (the prompt contract: `serialize`, `encode`), the paper's
-BeaverTails scoring (`evaluation/paper.py`), config loading, the experiment registry and run manifests. `training`,
-`models` and `decoding` are empty packages waiting for P4+.
+BeaverTails scoring (`evaluation/paper.py`), config loading, the experiment registry and run manifests, model loading
+(`models`), and the evaluate command (`thinkguard.evaluate`: batched greedy generation and the unsafe score in
+`evaluation/generate.py`, `evaluation/score.py`). `training` and `decoding` are empty packages waiting for P4+.
 
 ## Commands
 
@@ -31,7 +32,11 @@ uv run ruff format --check
 uv run pytest -m "not gpu"                   # what CI runs; `gpu` marker = needs CUDA
 uv run pytest tests/test_manifest.py::test_written_manifest_loads_and_an_edited_id_raises
 uv run python -m thinkguard.data.verify_readme --committed-only   # also in CI
+uv run python -m thinkguard.evaluate --config configs/eval/smoke_R.yaml [--resume runs/<id>]   # GPU host
 ```
+
+The evaluate command reads its split's source from `data/interim/` (not in git), so run steps 1–2 of the data
+pipeline below first on a fresh host (Colab). Set `THINKGUARD_RUNS` to persistent storage so runs survive a disconnect.
 
 Data pipeline, run from the repo root in this order (each module's docstring says what it reads and writes):
 
@@ -57,7 +62,8 @@ Data pipeline, run from the repo root in this order (each module's docstring say
 - **Splits are loaded only through `thinkguard.data.manifest.load_split(name)`**, which checks the sha256 of the
   rows' content (not just the ids). The four test sets are `sources.TEST_SETS`.
 - **Determinism:** generated files have no timestamps, use `newline="\n"`, and a rerun must be byte-identical.
-- **Test-set firewall (planned, #29/#9):** test splits may only be evaluated from configs under `configs/frozen/`.
+- **Test-set firewall (#9, protocol.md):** `thinkguard.evaluate` runs a `test_*` split only from a committed,
+  unchanged config under `configs/frozen/` and committed code.
 - Tests use tiny inline fixtures and `tmp_path`; a test that hits the network is skipped when `CI=true`. The one
   exception is the tokenizer: B's is gated, so CI sets `THINKGUARD_TOKENIZER=thinkguard-released` and loads R's public
   one, which gives B's ids and offsets on every train and test row (checked once, in the commit that set it up).

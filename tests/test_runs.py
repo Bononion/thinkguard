@@ -46,6 +46,35 @@ def test_signal_marks_interrupted_with_an_end_time(tmp_path, signum):
     assert signal.getsignal(signal.SIGTERM) is not interrupt  # the previous handler is back
 
 
+def test_resume_goes_on_in_the_same_directory_unless_code_config_packages_or_gpu_model_differ(tmp_path, monkeypatch):
+    monkeypatch.setattr(runs, "dirty", lambda: False)
+    monkeypatch.setattr(runs, "gpu", lambda: "NVIDIA A100, 535.104")
+    with pytest.raises(KeyboardInterrupt), start_run("eval", Toy(), runs=tmp_path) as d:
+        raise KeyboardInterrupt
+    first = manifest(d)
+
+    monkeypatch.setattr(runs, "gpu", lambda: "NVIDIA A100, 550.54")  # another driver, same GPU model
+    with start_run("eval", Toy(), runs=tmp_path, run_dir=d) as again:
+        pass
+    assert again == d and list(tmp_path.iterdir()) == [d]
+    assert (manifest(d)["run_id"], manifest(d)["start"]) == (first["run_id"], first["start"])
+    assert manifest(d)["status"] == "completed"
+
+    before = (d / "manifest.json").read_bytes()
+    cases = [
+        ({"gpu": lambda: "Tesla T4, 550.54"}, Toy(), "'gpu'"),
+        ({}, Toy(seed=8), "'config_hash'"),
+        ({"dirty": lambda: True}, Toy(), "git_dirty"),
+    ]
+    for patches, config, match in cases:
+        with monkeypatch.context() as m:
+            for name, value in patches.items():
+                m.setattr(runs, name, value)
+            with pytest.raises(ValueError, match=match), start_run("eval", config, runs=tmp_path, run_dir=d):
+                pass
+    assert (d / "manifest.json").read_bytes() == before  # refused before writing
+
+
 def test_git_dirty_counts_tracked_changes_and_untracked_code(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
