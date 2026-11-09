@@ -29,3 +29,6 @@ uv run python -m thinkguard.evaluate --config configs/eval/smoke_R.yaml --resume
 Predictions go to `$THINKGUARD_RUNS/<id>/predictions.jsonl`. `--resume` refuses if the code, config, packages or GPU
 model differ from the interrupted run; then start over without it. Test splits run only from committed configs under
 `configs/frozen/` (protocol.md, Test-set firewall).
+
+`uv run python -m thinkguard.report scores --runs <id> [<id> ...]` scores stored predictions into
+`results/scores.csv`, one row per run and metric, without a GPU or the model weights.

@@ -4,8 +4,6 @@ import functools
 import os
 from dataclasses import dataclass
 
-from transformers import AutoTokenizer
-
 from thinkguard.registry import hub
 
 BASE = "llama-guard-3-8b"  # B; L and C are B plus a LoRA, so they share its tokenizer
@@ -44,6 +42,8 @@ def tokenizer():
     access to the gated repo; loaded once per process. THINKGUARD_TOKENIZER, if set, names another model there to load
     the tokenizer from: CI sets thinkguard-released, which is public and gives B's ids and offsets on every row.
     """
+    from transformers import AutoTokenizer  # here, so the constants above load without torch (thinkguard.report)
+
     repo, revision = hub(os.environ.get("THINKGUARD_TOKENIZER", BASE))
     return AutoTokenizer.from_pretrained(repo, revision=revision)
 
