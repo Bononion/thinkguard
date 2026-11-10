@@ -1,0 +1,11 @@
+# Overfit sanity for L (#14): 32 smoke rows, scored on the same rows. Not a reported number.
+mode: train_label_category
+train_split: smoke
+eval_split: smoke
+max_length: 2048  # protocol.md, Other choices
+lr: 2.0e-4  # protocol.md, Training
+epochs: 15
+evals_per_epoch: 1  # protocol.md, Checkpoint selection
+microbatch: 8
+grad_accum: 1
+seed: 0
