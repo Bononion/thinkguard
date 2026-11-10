@@ -115,3 +115,49 @@ def test_scored_checkpoints_match_a_standalone_predict(tiny_model, tmp_path):
         reloaded.eval(), [e.example_id for e in examples], prompts, trainer.eval_config, tmp_path / "standalone.jsonl"
     )
     assert (tmp_path / "standalone.jsonl").read_bytes() == (tmp_path / "validation/step-3.jsonl").read_bytes()
+
+
+def test_a_run_interrupted_after_a_checkpoint_resumes_to_the_same_losses_and_weights(tiny_model, tmp_path):
+    """6 steps scored and saved at 3 and 6, with LoRA dropout (so the RNG state matters): uninterrupted, and stopped
+    by KeyboardInterrupt right after checkpoint 3 is saved, then resumed from it in a new Trainer.
+    """
+    from test_prompts import example
+    from transformers import TrainerCallback
+    from transformers.trainer_utils import get_last_checkpoint
+
+    class Stop(TrainerCallback):
+        def on_save(self, args, state, control, **kwargs):
+            if state.global_step == 3:
+                raise KeyboardInterrupt
+
+    examples = [dataclasses.replace(example(), example_id="v", gold_safety_label="unsafe")]
+    config = dataclasses.replace(CONFIG, microbatch=1, grad_accum=1, epochs=1, evals_per_epoch=2)
+    train_rows = synthetic_rows() + synthetic_rows()[:2]
+
+    def run(out, callbacks=()):
+        trainer = make_trainer(lora_model(tiny_model, dropout=0.5), config, train_rows, out, examples, **CPU)
+        for c in callbacks:
+            trainer.add_callback(c)
+        return trainer
+
+    whole = run(tmp_path / "whole")
+    whole.train()
+    with pytest.raises(KeyboardInterrupt):
+        run(tmp_path / "cut", [Stop()]).train()
+
+    class Count(TrainerCallback):
+        steps = 0
+
+        def on_step_end(self, args, state, control, **kwargs):
+            Count.steps += 1
+
+    resumed = run(tmp_path / "cut", [Count()])
+    resumed.train(resume_from_checkpoint=get_last_checkpoint(tmp_path / "cut"))
+    assert Count.steps == 3  # steps 4-6 only: it resumed, not restarted
+
+    def losses(t):
+        return [(h["step"], h["loss"]) for h in t.state.log_history if "loss" in h]
+
+    assert len(losses(whole)) == 6 and losses(resumed) == pytest.approx(losses(whole), abs=1e-6)
+    w, r = (dict(t.model.named_parameters()) for t in (whole, resumed))
+    assert max((w[n] - r[n]).abs().max().item() for n in w if "lora_" in n) < 1e-6

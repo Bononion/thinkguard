@@ -48,3 +48,22 @@ uv run python -m thinkguard.report gate          # results/gate.md; prints PASS 
 
 Commit `results/scores.csv` and `results/gate.md`. On PASS, tag the commit that ran R `harness-frozen`; on FAIL,
 stop: no training before the cause is found (protocol.md, Harness gate fixes).
+
+## Train
+
+```bash
+uv run python -m thinkguard.training.data --mode train_critique --n 2   # the supervised tokens, by eye
+uv run python -m thinkguard.train --config configs/train/overfit_critique.yaml   # #14, then overfit_label_category
+uv run python -m thinkguard.evaluate --config configs/eval/smoke_C.yaml --adapter $THINKGUARD_RUNS/<id>/checkpoint-<n>
+uv run python -m thinkguard.train --config configs/train/pilot_critique.yaml     # #61, then pilot_label_category
+uv run python -m thinkguard.train --config configs/train/critique.yaml           # C; label_category.yaml for L
+uv run python -m thinkguard.train --config configs/train/critique.yaml --resume $THINKGUARD_RUNS/<id>  # after a disconnect
+```
+
+Each run prints its directory. It is scored on validation 4 times per epoch (`validation/step-<n>.jsonl`, with
+`eval_runtime` in the log), saves a `checkpoint-<n>/` each time, ends with `best_checkpoint.json` and prints its peak
+GPU memory. `--resume` goes on from the last checkpoint with the same optimizer, scheduler, RNG and data position; it
+refuses if the code, config, packages or GPU model differ. If the disconnect came while a checkpoint was being saved,
+`--resume` fails on that half-written `checkpoint-<n>/`: delete it and `validation/step-<n>.jsonl` (scored before the
+save, so a resume would reuse it instead of scoring the retrained step), and resume again from the one before (which
+still has its optimizer state). `CKPT_DIR` must be set for `evaluate`, even with `--adapter`.
