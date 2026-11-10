@@ -13,6 +13,7 @@ from collections import Counter
 
 from thinkguard.data.manifest import load_split
 from thinkguard.evaluation.metrics import category_metrics, flag_rates, safety_metrics
+from thinkguard.evaluation.paper import beavertails_scores
 from thinkguard.evaluation.parse import parse
 from thinkguard.paths import ROOT
 from thinkguard.runs import RUNS
@@ -33,9 +34,11 @@ def flat(d, prefix=""):
 def score_run(manifest, predictions, examples):
     """{run_id, config_hash, condition, split, mode, then the metrics of protocol.md, Metrics, with nested ones as
     dotted keys (confusion.unsafe.invalid, per_category.<key>.f1)} for one run. predictions are its predictions.jsonl
-    rows, examples its split's Examples; a row's gold comes from the Example with its example_id. Category metrics
-    only on CATEGORY_SPLIT. Raises ValueError if the run did not complete, the predictions' example ids are not the
-    split's (missing, extra or repeated), or a row has another config_hash than the manifest.
+    rows, examples its split's Examples; a row's gold comes from the Example with its example_id. Only on
+    CATEGORY_SPLIT: category metrics, and paper.<reading>.f1 / .accuracy for the paper's four BeaverTails readings
+    (thinkguard.evaluation.paper), as fractions like every other metric. Raises ValueError if the run did not
+    complete, the predictions' example ids are not the split's (missing, extra or repeated), or a row has another
+    config_hash than the manifest.
     """
     run_id, h, config = manifest["run_id"], manifest["config_hash"], manifest["config"]
     if manifest["status"] != "completed":
@@ -56,6 +59,12 @@ def score_run(manifest, predictions, examples):
         out |= flat(
             category_metrics((e.gold_safety_label, e.gold_categories, p.label, p.categories) for e, p, _ in rows)
         )
+        paper = beavertails_scores(
+            (e.gold_safety_label, set(e.gold_categories or ()), p.label, p.categories) for e, p, _ in rows
+        )
+        out |= {
+            f"paper.{r}.{k}": v / 100 for r, fa in paper.items() for k, v in zip(("f1", "accuracy"), fa, strict=True)
+        }
     return out
 
 

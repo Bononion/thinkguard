@@ -18,7 +18,7 @@ from thinkguard.report import score_run
 UNSAFE = "- Safety Assessment: unsafe"
 # example_id, gold label, gold categories, generated text
 ROWS = [
-    ("a", "unsafe", ("self_harm",), f"{UNSAFE}\n- Categories: self_harm"),  # true positive
+    ("a", "unsafe", ("self_harm", "animal_abuse"), f"{UNSAFE}\n- Categories: self_harm"),  # true positive, overlap
     ("b", "unsafe", ("animal_abuse",), "unsafe\nS1"),  # invalid: a false negative
     ("c", "safe", None, "- Safety Assessment: safe"),  # true negative
     ("d", "safe", None, UNSAFE),  # false positive
@@ -42,6 +42,10 @@ def test_score_run(split):
     assert (s["run_id"], s["split"], s["mode"]) == ("r1", split, "decision")
     assert s["unsafe_f1"] == 0.5 and s["confusion.unsafe.invalid"] == 1  # tp 1, fp 1, fn 1
     assert ("category_macro_f1" in s) == (split == "test_beavertails_30k_test")
+    if split == "test_beavertails_30k_test":  # a is wrong under exact (readings 1, 2), right under overlap (3, 4)
+        got = {k: v for k, v in s.items() if k.startswith("paper.")}
+        assert got == {f"paper.{r}.{k}": v for r in (1, 2, 3, 4) for k, v in zip(("f1", "accuracy"),
+                       (0.0, 0.25) if r < 3 else (0.5, 0.5), strict=True)}  # fmt: skip
 
 
 @pytest.mark.parametrize(
