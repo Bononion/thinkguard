@@ -193,6 +193,8 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
 - Evaluation prompt: the contract, not `ThinkGuard.py`'s Llama Guard 3 prompt (S1-S14 categories).
 - ToxicChat is prompt-only: `ThinkGuard.py` passes `model_output` too, but the label is about the user input.
 - Prompt-only inputs (ToxicChat, OpenAI Moderation) never occur in training, where every row has a response.
+- B is not run under Llama Guard 3's native template (#11's diagnostic), for the GPU budget. If B under the contract
+  scores far below the paper's LLaMA Guard 3 row, it is run later as a labeled diagnostic.
 
 ## Training data filtering
 

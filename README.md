@@ -32,3 +32,19 @@ model differ from the interrupted run; then start over without it. Test splits r
 
 `uv run python -m thinkguard.report scores --runs <id> [<id> ...]` scores stored predictions into
 `results/scores.csv`, one row per run and metric, without a GPU or the model weights.
+
+## Harness gate (#13)
+
+R on the four test sets, from a fresh clone of a pushed commit (the firewall refuses uncommitted code). Each evaluate
+prints its run directory; resume an interrupted one with `--resume $THINKGUARD_RUNS/<id>`.
+
+```bash
+for b in beavertails_30k_test toxicchat_0124_test openai_moderation wildguardtest; do
+  uv run python -m thinkguard.evaluate --config configs/frozen/R_test_$b.yaml
+done
+uv run python -m thinkguard.report scores --runs <id1> <id2> <id3> <id4>
+uv run python -m thinkguard.report gate          # results/gate.md; prints PASS or FAIL
+```
+
+Commit `results/scores.csv` and `results/gate.md`. On PASS, tag the commit that ran R `harness-frozen`; on FAIL,
+stop: no training before the cause is found (protocol.md, Harness gate fixes).

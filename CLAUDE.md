@@ -35,6 +35,7 @@ uv run pytest tests/test_manifest.py::test_written_manifest_loads_and_an_edited_
 uv run python -m thinkguard.data.verify_readme --committed-only   # also in CI
 uv run python -m thinkguard.evaluate --config configs/eval/smoke_R.yaml [--resume runs/<id>]   # GPU host
 uv run python -m thinkguard.report scores --runs <id> [<id> ...]   # → results/scores.csv, no GPU
+uv run python -m thinkguard.report gate     # results/scores.csv → results/gate.md (R vs paper, #13)
 ```
 
 The evaluate command reads its split's source from `data/interim/` (not in git), so run steps 1–2 of the data

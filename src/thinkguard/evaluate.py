@@ -74,6 +74,7 @@ def main(argv=None):
     examples = load_split(config.split)
     prompts = [encode(e, "infer").input_ids for e in examples]
     with runs.start_run("eval", config, splits=(config.split,), run_dir=args.resume) as run_dir:
+        print(run_dir, flush=True)  # the id for --resume and report scores
         model = load_condition(registry.load()[config.condition])
         predict(model, [e.example_id for e in examples], prompts, config, run_dir / "predictions.jsonl")
 
