@@ -63,6 +63,21 @@ def test_evaluate_exits_on_a_test_split_before_reading_data(tmp_path, monkeypatc
         evaluate.main(["--config", str(config)])
 
 
+def test_evaluate_refuses_an_adapter_on_a_test_split(tmp_path):
+    config = tmp_path / "x.yaml"
+    config.write_text("condition: C\nsplit: test_wildguardtest\nmode: decision\nmax_new_tokens: 8\nbatch_size: 4\n")
+    with pytest.raises(ValueError, match="--adapter is not allowed"):
+        evaluate.main(["--config", str(config), "--adapter", str(tmp_path)])
+
+
+def test_evaluate_refuses_a_trained_condition_without_an_adapter(tmp_path, monkeypatch):
+    config = tmp_path / "x.yaml"
+    config.write_text("condition: C\nsplit: smoke\nmode: decision\nmax_new_tokens: 8\nbatch_size: 4\n")
+    monkeypatch.setattr(evaluate, "load_split", lambda name: pytest.fail("read the split before the adapter check"))
+    with pytest.raises(ValueError, match="C has no adapter"):
+        evaluate.main(["--config", str(config)])
+
+
 GOOD = {"condition": "R", "split": "smoke", "mode": "decision", "max_new_tokens": 32, "batch_size": 16}
 
 

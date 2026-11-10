@@ -13,6 +13,7 @@ from peft import LoraConfig  # noqa: E402
 from thinkguard.config import load  # noqa: E402
 from thinkguard.models import load as load_model  # noqa: E402
 from thinkguard.paths import ROOT  # noqa: E402
+from thinkguard.prompts import encode  # noqa: E402
 from thinkguard.train import LORA, TARGETS, add_lora, make_trainer, trainable_params  # noqa: E402
 from thinkguard.training.config import TrainConfig  # noqa: E402
 from thinkguard.training.data import IGNORE  # noqa: E402
@@ -82,3 +83,35 @@ def test_l_and_c_rows_come_in_the_same_batches_and_order(tiny_model, tmp_path):
 
     c_order = order(c_rows)
     assert order(l_rows) == c_order and sorted(sum(c_order, [])) == list(range(24))
+
+
+def test_scored_checkpoints_match_a_standalone_predict(tiny_model, tmp_path):
+    """5 steps, scored every ceil(5 / 2) = 3 and at the last: checkpoints 3 and 5, the optimizer state in 5 only, and
+    checkpoint 3's adapter reloaded and run through predict gives the bytes the training run scored.
+    """
+    from peft import PeftModel
+    from test_prompts import example
+
+    from thinkguard.evaluation.generate import predict
+
+    golds = ["safe", "unsafe", "unsafe", "safe"]
+    examples = [dataclasses.replace(example(), example_id=f"v{i}", user_prompt=f"Where {i}?", gold_safety_label=g)
+                for i, g in enumerate(golds)]  # fmt: skip
+    config = dataclasses.replace(CONFIG, microbatch=1, grad_accum=1, epochs=1, evals_per_epoch=2)
+    model = lora_model(tiny_model, dropout=0.5)  # so scoring in train mode would not match
+    trainer = make_trainer(model, config, synthetic_rows() + synthetic_rows()[:1], tmp_path, examples, **CPU)
+    trainer.train()
+    assert sorted(d.name for d in tmp_path.glob("checkpoint-*")) == ["checkpoint-3", "checkpoint-5"]
+    assert [p.parent.name for p in tmp_path.glob("checkpoint-*/optimizer.pt")] == ["checkpoint-5"]
+    assert [h["step"] for h in trainer.state.log_history if "eval_unsafe_f1" in h] == [3, 5]
+    assert (trainer.eval_config.mode, trainer.eval_config.max_new_tokens) == ("decision", 128)
+    assert trainer.state.best_model_checkpoint in (str(tmp_path / "checkpoint-3"), str(tmp_path / "checkpoint-5"))
+
+    reloaded = PeftModel.from_pretrained(
+        load_model(tiny_model, device="cpu", dtype=torch.float32), tmp_path / "checkpoint-3"
+    )
+    prompts = [encode(e, "infer").input_ids for e in examples]
+    predict(
+        reloaded.eval(), [e.example_id for e in examples], prompts, trainer.eval_config, tmp_path / "standalone.jsonl"
+    )
+    assert (tmp_path / "standalone.jsonl").read_bytes() == (tmp_path / "validation/step-3.jsonl").read_bytes()

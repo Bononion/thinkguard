@@ -1,0 +1,6 @@
+# A C checkpoint (evaluate --adapter) on smoke, with the critique: the overfit check (#14). Not a reported number.
+condition: C
+split: smoke
+mode: explanation
+max_new_tokens: 1024  # protocol.md, Other choices
+batch_size: 16
