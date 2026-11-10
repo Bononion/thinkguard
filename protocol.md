@@ -147,6 +147,14 @@ rows), never a test set.
 - `score_f1@t`, if reported: `t` maximizes the condition's `score_f1` on validation.
 - Max length and the truncation rule (#51) are chosen from train and validation token lengths only. Test-set lengths
   are reported (how many test rows the choice truncates) but never used to choose.
+- `max_length` = 2048 for training. No train or validation row is longer (longest 1192 and 1059 tokens,
+  `reports/token_length_report.csv`), so nothing is truncated and L and C see the same rows in full. The trainer
+  raises an error on a longer row instead of truncating it.
+- Evaluation never truncates a prompt. The longest test prompt is 4034 tokens (WildGuardTest), within the model's
+  context.
+- `max_new_tokens`: 128 for decision-only generation and 1024 with the explanation: the longest train or validation
+  target (decision 83 tokens; decision, explanation and `<|eot_id|>` 653) times 1.25, rounded up to a power of two.
+  An output that reaches it is flagged `truncated` (Parsing).
 
 ### Test-set firewall
 
