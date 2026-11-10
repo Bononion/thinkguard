@@ -109,9 +109,10 @@ for this gate and for comparisons with the paper's tables, never between our con
   (`thinkguard.evaluation.paper`).
 - `toxicchat_0124_test`, `wildguardtest`: `unsafe_f1`.
 
-The targets are ThinkGuard's Table 1 F1 and Table 3 accuracy in `results/paper_targets.csv`. R passes on a benchmark
-if `|paper_f1 - paper F1| <= 2.0` percentage points; on BeaverTails the chosen reading must also be within 2.0 points
-of the paper's accuracy. The gate covers these three benchmarks and passes when all three pass. OpenAI Moderation,
+The targets are ThinkGuard's Table 1 F1 and Table 3 accuracy in `results/paper_targets.csv`, not the Table 4 and
+Sec 4.2 values. Our numbers are rounded to one decimal, as the paper's are, and the difference is
+`Δ = round(round(ours, 1) - paper, 1)` in percentage points. R passes on a benchmark if `|Δ| <= 2.0` for `paper_f1`;
+on BeaverTails the chosen reading must also be within 2.0 points of the paper's accuracy. The gate covers these three benchmarks and passes when all three pass. OpenAI Moderation,
 whose upstream scoring encodes mismatches as `-1` without saying how they enter F1, is reported with its difference
 but not gated.
 

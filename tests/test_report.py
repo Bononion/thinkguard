@@ -108,3 +108,47 @@ def test_scores_refuses_two_runs_of_one_condition_split_and_mode(scores, tmp_pat
 def test_report_does_not_import_torch():  # so the tables can be rebuilt without the model weights
     check = "import sys, thinkguard.report; assert 'torch' not in sys.modules, 'torch imported'"
     subprocess.run([sys.executable, "-c", check], check=True)
+
+
+PAPER_TARGETS = report.read_csv(report.ROOT / "results/paper_targets.csv")  # the real file, Table 4's 82.3 included
+OURS = {  # R at the paper's numbers; on BeaverTails reading 3 matches and the others are far
+    "beavertails_30k_test": {"unsafe_f1": 0.7, "unsafe_auprc": 0.917, "paper.3.f1": 0.827, "paper.3.accuracy": 0.816}
+    | {f"paper.{r}.{k}": 0.5 for r in (1, 2, 4) for k in ("f1", "accuracy")},
+    "toxicchat_0124_test": {"unsafe_f1": 0.635, "unsafe_auprc": 0.653},
+    "openai_moderation": {"unsafe_f1": 0.773, "unsafe_auprc": 0.807},
+    "wildguardtest": {"unsafe_f1": 0.786, "unsafe_auprc": 0.803},
+}
+
+
+def scores_rows(ours):
+    """scores.csv rows of one R decision-only run per benchmark in ours ({benchmark: {metric: value}})."""
+    return [
+        {"run_id": f"r-{b}", "config_hash": "h", "condition": "R", "split": f"test_{b}", "mode": "decision",
+         "metric": k, "value": str(v)}
+        for b, m in ours.items() for k, v in (m | {"coverage": 1.0}).items()
+    ]  # fmt: skip
+
+
+@pytest.mark.parametrize(
+    "benchmark, metric, value, first",
+    [
+        (None, None, None, "PASS"),
+        ("toxicchat_0124_test", "unsafe_f1", 0.66, "FAIL"),  # Δ +2.5
+        ("toxicchat_0124_test", "unsafe_f1", 0.6146, "PASS"),  # Δ -2.04, -2.0 at the paper's one decimal
+        ("beavertails_30k_test", "paper.3.accuracy", 0.795, "FAIL"),  # F1 passes, accuracy Δ -2.1
+        ("openai_moderation", "unsafe_f1", 0.673, "PASS"),  # Δ -10, not gated
+        ("beavertails_30k_test", "paper.3.f1", 0.845, "PASS"),  # Δ +1.8 from Table 1's 82.7, +2.2 from Table 4's 82.3
+    ],
+)
+def test_gate(benchmark, metric, value, first):
+    ours = {b: dict(m) for b, m in OURS.items()}
+    if benchmark:
+        ours[benchmark][metric] = value
+    text = report.gate(scores_rows(ours), PAPER_TARGETS)
+    assert text.splitlines()[0] == first and "(reading 3 chosen)" in text
+
+
+def test_gate_raises_without_a_gated_benchmark():
+    ours = {b: m for b, m in OURS.items() if b != "wildguardtest"}
+    with pytest.raises(ValueError, match="wildguardtest"):
+        report.gate(scores_rows(ours), PAPER_TARGETS)
