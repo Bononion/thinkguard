@@ -2,5 +2,5 @@
 condition: R
 split: smoke
 mode: explanation
-max_new_tokens: 256  # until #51 fixes the max length
+max_new_tokens: 1024  # protocol.md, Other choices
 batch_size: 16

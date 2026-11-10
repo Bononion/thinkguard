@@ -49,6 +49,7 @@ Data pipeline, run from the repo root in this order (each module's docstring say
 4. `uv run python -m thinkguard.data.audit` → `reports/data_audit.md`
 5. `uv run python -m thinkguard.data.verify_readme [--write]` → checks/regenerates the numbers block in
    `data/README.md`
+6. `uv run python -m thinkguard.data.token_lengths` → `reports/token_length_report.csv` (evidence for `max_length`)
 
 ## Architecture and invariants
 
