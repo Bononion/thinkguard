@@ -109,9 +109,10 @@ for this gate and for comparisons with the paper's tables, never between our con
   (`thinkguard.evaluation.paper`).
 - `toxicchat_0124_test`, `wildguardtest`: `unsafe_f1`.
 
-The targets are ThinkGuard's Table 1 F1 and Table 3 accuracy in `results/paper_targets.csv`. R passes on a benchmark
-if `|paper_f1 - paper F1| <= 2.0` percentage points; on BeaverTails the chosen reading must also be within 2.0 points
-of the paper's accuracy. The gate covers these three benchmarks and passes when all three pass. OpenAI Moderation,
+The targets are ThinkGuard's Table 1 F1 and Table 3 accuracy in `results/paper_targets.csv`, not the Table 4 and
+Sec 4.2 values. Our numbers are rounded to one decimal, as the paper's are, and the difference is
+`Δ = round(round(ours, 1) - paper, 1)` in percentage points. R passes on a benchmark if `|Δ| <= 2.0` for `paper_f1`;
+on BeaverTails the chosen reading must also be within 2.0 points of the paper's accuracy. The gate covers these three benchmarks and passes when all three pass. OpenAI Moderation,
 whose upstream scoring encodes mismatches as `-1` without saying how they enter F1, is reported with its difference
 but not gated.
 
@@ -192,6 +193,8 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
 - Evaluation prompt: the contract, not `ThinkGuard.py`'s Llama Guard 3 prompt (S1-S14 categories).
 - ToxicChat is prompt-only: `ThinkGuard.py` passes `model_output` too, but the label is about the user input.
 - Prompt-only inputs (ToxicChat, OpenAI Moderation) never occur in training, where every row has a response.
+- B is not run under Llama Guard 3's native template (#11's diagnostic), for the GPU budget. If B under the contract
+  scores far below the paper's LLaMA Guard 3 row, it is run later as a labeled diagnostic.
 
 ## Training data filtering
 

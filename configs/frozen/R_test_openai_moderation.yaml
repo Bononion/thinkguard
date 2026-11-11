@@ -1,0 +1,6 @@
+# R on openai_moderation for the harness gate (#12, #13). Frozen: never edited after its first run (protocol.md, Test-set firewall).
+condition: R
+split: test_openai_moderation
+mode: decision
+max_new_tokens: 128  # protocol.md, Other choices
+batch_size: 8  # 16 rows of 4034 tokens do not fit an L4
