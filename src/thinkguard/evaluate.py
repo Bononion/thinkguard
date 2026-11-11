@@ -8,7 +8,7 @@ Every check runs before the model loads.
 
 import argparse
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from thinkguard import registry, runs
@@ -68,14 +68,21 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Generate predictions for one condition on one split.")
     parser.add_argument("--config", required=True, help="an EvalConfig YAML file")
     parser.add_argument("--resume", type=Path, help="the runs/<id> directory of an interrupted run of this config")
+    parser.add_argument("--adapter", type=Path, help="a checkpoint directory instead of the registry's adapter")
     args = parser.parse_args(argv)
     config = load(args.config, EvalConfig)
+    if args.adapter and config.split.startswith("test_"):  # a test split runs only registered, frozen checkpoints
+        raise ValueError(f"{config.split}: --adapter is not allowed on a test split")
+    adapter = args.adapter and str(args.adapter.resolve())
+    entry = registry.load()[config.condition]
+    if entry.parent is not None and not (adapter or entry.adapter):  # else it would score the parent as this entry
+        raise ValueError(f"{config.condition} has no adapter in the registry: pass --adapter <checkpoint dir>")
     check_firewall(args.config, config.split)
     examples = load_split(config.split)
     prompts = [encode(e, "infer").input_ids for e in examples]
-    with runs.start_run("eval", config, splits=(config.split,), run_dir=args.resume) as run_dir:
+    with runs.start_run("eval", config, splits=(config.split,), parent=adapter, run_dir=args.resume) as run_dir:
         print(run_dir, flush=True)  # the id for --resume and report scores
-        model = load_condition(registry.load()[config.condition])
+        model = load_condition(replace(entry, adapter=adapter) if adapter else entry)
         predict(model, [e.example_id for e in examples], prompts, config, run_dir / "predictions.jsonl")
 
 

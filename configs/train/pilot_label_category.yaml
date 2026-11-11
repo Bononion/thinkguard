@@ -1,0 +1,11 @@
+# Pilot (#61): 1 epoch on the 1000 pilot rows (the 20 longest included) to measure tokens/s, peak memory and the time of one validation pass (scored once, at the last step). Not a reported number.
+mode: train_label_category
+train_split: pilot
+eval_split: validation
+max_length: 2048  # protocol.md, Other choices
+lr: 2.0e-4  # protocol.md, Training
+epochs: 1
+evals_per_epoch: 1  # one validation pass is enough to time it
+microbatch: 8
+grad_accum: 4
+seed: 0

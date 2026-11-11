@@ -137,11 +137,21 @@ rows), never a test set.
 
 ### Loss convention (#62)
 
-- Candidates: `token_mean_all` and `segment_mean` with λ = 1, each a pilot-length C run (#61).
-- Choice: the candidate whose best checkpoint has the higher validation `unsafe_f1`; if the two are within 0.5
-  percentage points, `token_mean_all`. The paper sums the label loss and the critique loss over tokens (Section 3.3,
-  Eq. 2-4), which `token_mean_all` is closest to; `segment_mean`, if chosen, is listed under Deviations.
-- L and C use the same convention.
+- `token_mean_all`: cross-entropy summed over every supervised token of an optimizer step's 32 examples, divided by
+  their number, across gradient accumulation (Hugging Face's causal-LM loss with `-100` labels). The paper sums the
+  label loss and the critique loss over tokens (Section 3.3, Eq. 2-4), which this is closest to.
+- Supervised tokens: everything after the prompt. L: the decision and `<|eot_id|>`; C: the decision, the explanation
+  and `<|eot_id|>`.
+- `segment_mean` is not compared (Deviations). L and C use the same convention.
+
+### Training (L and C)
+
+- B with a LoRA adapter: r 16, alpha 32, dropout 0.05 on `q/k/v/o/gate/up/down_proj`; every other weight frozen.
+- AdamW, lr 2e-4, cosine schedule, warmup ratio 0.03, bf16, gradient checkpointing. 32 examples per optimizer step
+  (microbatch 8, gradient accumulation 4), 4 epochs, as in the paper (Section 4.1) except the lr. Fewer epochs, if the
+  pilot (#61) shows the budget cannot cover 4, are listed under Deviations before L or C is trained.
+- Order: batches group rows of similar `train_critique` length, shuffled by seed 0, so L and C see the same examples
+  in the same batches and order.
 
 ### Other choices
 
@@ -195,6 +205,10 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
 - Prompt-only inputs (ToxicChat, OpenAI Moderation) never occur in training, where every row has a response.
 - B is not run under Llama Guard 3's native template (#11's diagnostic), for the GPU budget. If B under the contract
   scores far below the paper's LLaMA Guard 3 row, it is run later as a labeled diagnostic.
+- lr 2e-4, not the paper's 2e-5: the paper's lr is for full fine-tuning, and LoRA's best lr is about 10 times that
+  ("LoRA Without Regret", Thinking Machines Lab, 2025).
+- `token_mean_all` is used without the pilot comparison with `segment_mean` (#62), for the GPU budget.
+- The overfit sanity check (#14) runs on B, not on Llama Guard 3-1B, so it also checks B's memory and lr.
 
 ## Training data filtering
 

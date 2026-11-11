@@ -18,7 +18,9 @@ Implemented: `thinkguard.data`, `thinkguard.prompts` (the prompt contract: `seri
 BeaverTails scoring (`evaluation/paper.py`), config loading, the experiment registry and run manifests, model loading
 (`models`), and the evaluate command (`thinkguard.evaluate`: batched greedy generation and the unsafe score in
 `evaluation/generate.py`, `evaluation/score.py`), and `results/scores.csv` from stored predictions
-(`thinkguard.report`, needs no torch). `training` and `decoding` are empty packages waiting for P4+.
+(`thinkguard.report`, needs no torch), and training L and C (`thinkguard.train`: B + LoRA with Hugging Face's
+Trainer, rows and masks in `training/data.py`, validation scoring through the evaluate path). `decoding` is empty,
+waiting for P6+.
 
 ## Commands
 
@@ -36,6 +38,7 @@ uv run python -m thinkguard.data.verify_readme --committed-only   # also in CI
 uv run python -m thinkguard.evaluate --config configs/eval/smoke_R.yaml [--resume runs/<id>]   # GPU host
 uv run python -m thinkguard.report scores --runs <id> [<id> ...]   # → results/scores.csv, no GPU
 uv run python -m thinkguard.report gate     # results/scores.csv → results/gate.md (R vs paper, #13)
+uv run python -m thinkguard.train --config configs/train/critique.yaml [--resume <run dir>]   # GPU host
 ```
 
 The evaluate command reads its split's source from `data/interim/` (not in git), so run steps 1–2 of the data

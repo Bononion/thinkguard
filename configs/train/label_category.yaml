@@ -1,0 +1,11 @@
+# L: B + LoRA on the decision and categories (protocol.md, Training).
+mode: train_label_category
+train_split: train
+eval_split: validation
+max_length: 2048  # protocol.md, Other choices
+lr: 2.0e-4  # protocol.md, Training
+epochs: 4
+evals_per_epoch: 4  # protocol.md, Checkpoint selection
+microbatch: 8
+grad_accum: 4
+seed: 0
