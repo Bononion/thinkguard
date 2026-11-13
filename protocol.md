@@ -57,7 +57,7 @@ only reads these rules.
 - Flags, which never change the label:
   - `invalid_label`: no valid label line.
   - `unknown_category`: as above.
-  - `contradiction`: the explanation gives a direct verdict for the other label (the audit's pattern).
+  - `contradiction`: the explanation gives a direct verdict for the other label (`critique_format.CONTRADICTION`).
   - `truncated`: the text has no `<|eot_id|>` and does not end at the decision-only stop `\n- Explanation:`, so
     generation hit `max_new_tokens`.
 - `<flag>_rate`, for each of the four flags: scored rows with the flag / scored rows. `invalid_label_rate` is
@@ -240,8 +240,7 @@ conflict to `reports/label_conflicts.jsonl`.
 ## Validation split
 
 Applies to the rows of `data/interim/critique_filtered.jsonl` whose `exclusion_reason` is null (the rows kept for
-training). `thinkguard.data.split` applies these rules; `uv run python -m thinkguard.data.audit` reports the result in
-`reports/data_audit.md`, Validation split.
+training). `thinkguard.data.split` applies these rules; the result is in `reports/data_audit.md`, Validation split.
 
 - Validation is about 5% of the kept training rows, grouped by `prompt_hash`: every row with the same prompt goes to
   the same side, so no prompt appears in both.

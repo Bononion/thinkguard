@@ -40,7 +40,8 @@ class Encoded:
 def tokenizer():
     """B's tokenizer at the revision pinned in configs/frozen/source_manifest.json. Needs a Hugging Face login with
     access to the gated repo; loaded once per process. THINKGUARD_TOKENIZER, if set, names another model there to load
-    the tokenizer from: CI sets thinkguard-released, which is public and gives B's ids and offsets on every row.
+    the tokenizer from: tests/conftest.py sets thinkguard-released, which is public and gives B's ids and offsets on
+    every row.
     """
     from transformers import AutoTokenizer  # here, so the constants above load without torch (thinkguard.report)
 

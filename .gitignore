@@ -1,5 +1,7 @@
 data/raw/
 data/interim/
+runs/*
+!runs/.gitkeep
 
 .venv/
 __pycache__/
