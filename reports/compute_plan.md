@@ -9,7 +9,7 @@ below is proposed here.
 - Units per hour depend on the GPU and are shown by Colab when the runtime starts; each ledger row records the units
   its session used. Measured on Colab Pro: L4 about 1.94 units per hour for one session (2026-11-03), so 100 units is
   about 51 L4-hours. The first ledger row's 0.44 units include a second session that was open at the same time (3.09
-  units per hour together).
+  units per hour together). A100-SXM4-40GB: 6.73 units per hour, shown by Colab on 2026-11-12.
 - The roadmap planned about 56 A100-hours for the whole project. 100 units is a small fraction of that, so the cut
   order below is expected to be used.
 
@@ -27,15 +27,22 @@ T_total = T_pilots + T_L + T_C + T_E + T_evaluation + T_benchmark + T_recovery
 
 | Term | Estimate | Source |
 |---|---|---|
-| T_pilots | TBD | #61 |
-| T_L, T_C | TBD | #61 (steps per epoch × seconds per step) |
+| T_pilots | done, with the overfit runs | ledger |
+| T_C | 5.2 A100-hours: 4 epochs of 445 steps at 8.4 s (the full run's rate), plus 16 validation passes of 4 min | `reports/pilot.md` |
+| T_L | 2.9 A100-hours: 4 epochs of 445 steps at 3.8 s, plus 16 validation passes of 3.7 min | `reports/pilot.md` |
 | T_E | TBD | #61, with the exit and layer-dropout costs from #36 |
-| T_evaluation | TBD | #55 (eval throughput) |
+| T_evaluation | about 1 A100-hour per condition on the four test sets (11,509 rows; validation scores 750 rows in about 4 min) | `reports/pilot.md` |
 | T_benchmark | TBD | #89 |
 | T_recovery | TBD | reruns after interruptions, from the ledger |
 
-Before measurement, a rough guess for training L and C and evaluating B, L, C and R is 15-25 A100-hours, which may
-already exceed the budget. #61 replaces it with measured numbers.
+Against the budget, at 6.73 units per A100-hour: 81.2 units were left on 2026-11-12 after the pilots, before C
+started. C, L, and B, L and C on the test sets need about 5.2 + 2.9 + 3 = 11.1 A100-hours, about 75 units, which
+leaves about 6 units before any reruns. The reproduction comes first: T_E and T_benchmark are not budgeted until it
+is done.
+
+C used 46.96 units (ledger), about 7 A100-hours: 4.8 hours of training and validation, the rest setup and a runtime
+left connected after the run stopped. 34.24 units are left, short of L and the test evaluations (about 40), so
+Bononion adds 100 units. A runtime is disconnected as soon as its run ends.
 
 ## Scope-cut order
 
