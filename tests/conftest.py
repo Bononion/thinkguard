@@ -1,6 +1,10 @@
 """Shared fixtures."""
 
+import os
+
 import pytest
+
+os.environ.setdefault("THINKGUARD_TOKENIZER", "thinkguard-released")  # B's is gated; R's gives B's ids (CLAUDE.md)
 
 
 @pytest.fixture(scope="session")

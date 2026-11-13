@@ -25,11 +25,12 @@ waiting for P6+.
 ## Commands
 
 Setup is Linux + NVIDIA GPU (`bash scripts/setup_env.sh`, needs `HF_HOME`, `CKPT_DIR`, and `HF_TOKEN` for the gated
-Llama Guard / WildGuardTest). The data code and tests run anywhere after `uv sync`. Run everything through `uv run`;
-never `pip install` into `.venv`. Add or change a dependency with `uv add` so `uv.lock` stays in sync.
+Llama Guard / WildGuardTest). The data code and tests run anywhere after `uv sync --group gpu` (CPU torch is enough).
+Run everything through `uv run`; never `pip install` into `.venv`. Add or change a dependency with `uv add` so
+`uv.lock` stays in sync.
 
 ```bash
-uv sync                                      # .venv from uv.lock; add --group gpu on the GPU host
+uv sync --group gpu                          # .venv from uv.lock; torch is needed by the tests too
 uv run ruff check                            # line length 120, py311
 uv run ruff format --check
 uv run pytest -m "not gpu"                   # what CI runs; `gpu` marker = needs CUDA
@@ -68,8 +69,9 @@ Data pipeline, run from the repo root in this order (each module's docstring say
 - **Test-set firewall (#9, protocol.md):** `thinkguard.evaluate` runs a `test_*` split only from a committed,
   unchanged config under `configs/frozen/` and committed code.
 - Tests use tiny inline fixtures and `tmp_path`; a test that hits the network is skipped when `CI=true`. The one
-  exception is the tokenizer: B's is gated, so CI sets `THINKGUARD_TOKENIZER=thinkguard-released` and loads R's public
-  one, which gives B's ids and offsets on every train and test row (checked once, in the commit that set it up).
+  exception is the tokenizer: B's is gated, so `tests/conftest.py` sets `THINKGUARD_TOKENIZER=thinkguard-released`
+  (unless already set), which loads R's public one: it gives B's ids and offsets on every train and test row (checked
+  once, in the commit that set it up).
 
 ## Conventions
 
