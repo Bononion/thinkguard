@@ -1,7 +1,7 @@
 # Compatibility spike
 
 What the target GPU and the pinned stack actually do, measured on Colab. The sections are written from the output of
-the scripts in `scripts/`, run from this branch's commits.
+the one-off `scripts/spike_*.py`, deleted after the spike; they are in git at `3b863db`.
 
 ## Environment (#3)
 

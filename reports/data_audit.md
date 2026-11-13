@@ -1,5 +1,8 @@
 # Data audit
 
+Frozen evidence for the data decisions in `protocol.md`; its one-off generator (`thinkguard.data.audit`) was
+deleted once they were fixed.
+
 ## Critique release
 
 Source: `https://raw.githubusercontent.com/luka-group/ThinkGuard/a7d0c8924a343009e9fd4b31aa84ac845b1ff454/data/beavertails_critiques_aug.json`, 15000 rows. Flagged rows: `reports/critique_flags.jsonl` (6 lines).

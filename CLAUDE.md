@@ -34,7 +34,6 @@ uv run ruff check                            # line length 120, py311
 uv run ruff format --check
 uv run pytest -m "not gpu"                   # what CI runs; `gpu` marker = needs CUDA
 uv run pytest tests/test_manifest.py::test_written_manifest_loads_and_an_edited_id_raises
-uv run python -m thinkguard.data.verify_readme --committed-only   # also in CI
 uv run python -m thinkguard.evaluate --config configs/eval/smoke_R.yaml [--resume runs/<id>]   # GPU host
 uv run python -m thinkguard.report scores --runs <id> [<id> ...]   # → results/scores.csv, no GPU
 uv run python -m thinkguard.report gate     # results/scores.csv → results/gate.md (R vs paper, #13)
@@ -50,10 +49,7 @@ Data pipeline, run from the repo root in this order (each module's docstring say
 2. `uv run python -m thinkguard.data.filter_train` → `data/interim/critique_filtered.jsonl`,
    `reports/label_conflicts.jsonl`
 3. `uv run python -m thinkguard.data.manifest` → `data/manifests/<split>.json` (in git)
-4. `uv run python -m thinkguard.data.audit` → `reports/data_audit.md`
-5. `uv run python -m thinkguard.data.verify_readme [--write]` → checks/regenerates the numbers block in
-   `data/README.md`
-6. `uv run python -m thinkguard.data.token_lengths` → `reports/token_length_report.csv` (evidence for `max_length`)
+4. `uv run python -m thinkguard.data.token_lengths` → `reports/token_length_report.csv` (evidence for `max_length`)
 
 ## Architecture and invariants
 

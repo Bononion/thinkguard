@@ -126,7 +126,7 @@ print(Counter(r['response_refusal_label'] for r in rows
 
 ## R prompt spike
 
-`uv run python scripts/spike_prompt.py` on Colab L4 (#48); the ways are defined in its docstring.
+`uv run python scripts/spike_prompt.py` on Colab L4 (#48); the ways are defined in its docstring (deleted; in git at `3b863db`).
 
 Run `20261104-1553-spike-45193dbb`, `Rakancorle1/ThinkGuard` at `b202736aaed0b63d5ad67b45d67601b53db34205`, bf16.
 32 smoke rows, greedy, batched with left padding, `max_new_tokens=100`.

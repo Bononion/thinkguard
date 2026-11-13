@@ -27,4 +27,3 @@ jobs:
       - run: uv run pytest -m "not gpu"
         env:
           THINKGUARD_TOKENIZER: thinkguard-released  # B's is gated; R's gives the same ids (CLAUDE.md)
-      - run: uv run python -m thinkguard.data.verify_readme --committed-only
