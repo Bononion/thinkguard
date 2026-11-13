@@ -40,6 +40,10 @@ started. C, L, and B, L and C on the test sets need about 5.2 + 2.9 + 3 = 11.1 A
 leaves about 6 units before any reruns. The reproduction comes first: T_E and T_benchmark are not budgeted until it
 is done.
 
+C used 46.96 units (ledger), about 7 A100-hours: 4.8 hours of training and validation, the rest setup and a runtime
+left connected after the run stopped. 34.24 units are left, short of L and the test evaluations (about 40), so
+Bononion adds 100 units. A runtime is disconnected as soon as its run ends.
+
 ## Scope-cut order
 
 A cut is made when the ledger and the estimate show that the remaining work exceeds the remaining budget. Cuts are
