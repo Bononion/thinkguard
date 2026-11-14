@@ -1,7 +1,8 @@
 """The experiment registry (configs/experiment_registry.yaml): one entry per condition in protocol.md, Conditions.
 
 An entry names its base model by its name in configs/frozen/source_manifest.json, which pins the revision, and the
-entry it is trained from (parent). adapter is the path of the trained LoRA adapter, null until the entry is trained.
+entry it is trained from (parent). adapter names the trained LoRA adapter there too (frozen at a revision, #63), null
+until the entry is trained.
 The file is a list, not a mapping keyed by id, so a repeated id is an error instead of YAML keeping only the last one.
 """
 
@@ -43,8 +44,8 @@ def hub(name, sources=SOURCE_MANIFEST):
 
 def load(path=REGISTRY, sources=SOURCE_MANIFEST):
     """The registry's entries by id, in file order. Raises ValueError if an id repeats, a parent is not an entry or
-    parents form a cycle, an entry without a parent has an adapter, a base is not a model in sources, or decode is not
-    in DECODES; from_dict raises on an unknown or missing key.
+    parents form a cycle, an entry without a parent has an adapter, a base or adapter is not a model in sources, or
+    decode is not in DECODES; from_dict raises on an unknown or missing key.
     """
     with open(path, encoding="utf-8") as f:
         entries = [from_dict(Entry, e) for e in yaml.safe_load(f)]
@@ -61,6 +62,8 @@ def load(path=REGISTRY, sources=SOURCE_MANIFEST):
             raise ValueError(f"{e.id}: decode {e.decode!r} is not one of {DECODES}")
         if e.parent is None and e.adapter is not None:
             raise ValueError(f"{e.id}: an adapter needs a parent to be trained from")
+        if e.adapter is not None and e.adapter not in models:
+            raise ValueError(f"{e.id}: adapter {e.adapter!r} is not a model in {sources}")
         seen, p = {e.id}, e.parent
         while p is not None:
             if p not in by_id:

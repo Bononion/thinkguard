@@ -29,3 +29,19 @@ def test_load_gives_the_base_and_attaches_an_adapter(tiny_model, tmp_path):
     adapted = load(tiny_model, adapter=tmp_path / "adapter", device="cpu", dtype=torch.float32)
     assert torch.equal(logits(adapted), expected)
     assert not torch.allclose(logits(adapted), logits(plain))
+
+
+def test_load_condition_takes_a_registered_adapter_from_the_hub_and_a_directory_as_is(tmp_path, monkeypatch):
+    from thinkguard import models
+    from thinkguard.registry import Entry
+
+    calls = []
+    monkeypatch.setattr(models, "hub", lambda name: (f"org/{name}", f"rev-{name}"))
+    monkeypatch.setattr(models, "load", lambda *args, **kwargs: calls.append((args, kwargs)))
+    for adapter in ("thinkguard-repro-C", str(tmp_path)):
+        models.load_condition(Entry("C", "r", "base", "B", adapter, "greedy"), device="cpu")
+    assert calls == [
+        (("org/base", "rev-base"), {"adapter": "org/thinkguard-repro-C", "adapter_revision": "rev-thinkguard-repro-C",
+                                    "device": "cpu"}),
+        (("org/base", "rev-base"), {"adapter": str(tmp_path), "adapter_revision": None, "device": "cpu"}),
+    ]  # fmt: skip
