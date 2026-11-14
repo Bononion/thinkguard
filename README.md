@@ -66,4 +66,17 @@ GPU memory. `--resume` goes on from the last checkpoint with the same optimizer,
 refuses if the code, config, packages or GPU model differ. If the disconnect came while a checkpoint was being saved,
 `--resume` fails on that half-written `checkpoint-<n>/`: delete it and `validation/step-<n>.jsonl` (scored before the
 save, so a resume would reuse it instead of scoring the retrained step), and resume again from the one before (which
-still has its optimizer state). `CKPT_DIR` must be set for `evaluate`, even with `--adapter`.
+still has its optimizer state).
+
+## Test results (#63, #64)
+
+B, L and C on the four test sets with R's settings, from a pushed commit after `harness-frozen`. L's and C's adapters
+load from the private `thinkguard-repro` repos on Hugging Face at the revisions in `configs/frozen/source_manifest.json`,
+so `HF_TOKEN` must belong to a member of that organization.
+
+```bash
+for c in B L C; do for b in beavertails_30k_test toxicchat_0124_test openai_moderation wildguardtest; do
+  uv run python -m thinkguard.evaluate --config configs/frozen/${c}_test_$b.yaml
+done; done
+uv run python -m thinkguard.report scores --runs <the 12 ids> <R's 4 ids from results/gate.md>
+```

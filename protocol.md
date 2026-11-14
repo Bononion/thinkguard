@@ -134,6 +134,10 @@ rows), never a test set.
 - Best checkpoint: the highest validation `unsafe_f1`; a tie goes to the earlier step.
 - The paper saves a checkpoint every 500 steps and does not say how it picks one (Section 4.1): selecting on
   validation is our rule, not the paper's.
+- Frozen (#63) before L or C runs on a test set, as private Hugging Face repos pinned by revision in
+  `configs/frozen/source_manifest.json` (adapter files only):
+  - L: `checkpoint-896` of run `20261113-1744-train-7565b8e7` (epoch 2 of 4), validation `unsafe_f1` 0.898.
+  - C: `checkpoint-1568` of run `20261112-2147-train-a88bcf0c` (epoch 3.5 of 4), validation `unsafe_f1` 0.892.
 
 ### Loss convention (#62)
 

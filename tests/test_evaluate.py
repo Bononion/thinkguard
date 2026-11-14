@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from thinkguard import evaluate, runs
+from thinkguard import evaluate, registry, runs
 from thinkguard.config import load
 from thinkguard.data.sources import TEST_SETS
 from thinkguard.evaluate import EvalConfig, check_firewall
@@ -78,6 +78,8 @@ def test_evaluate_refuses_a_trained_condition_without_an_adapter(tmp_path, monke
     config = tmp_path / "x.yaml"
     config.write_text("condition: C\nsplit: smoke\nmode: decision\nmax_new_tokens: 8\nbatch_size: 4\n")
     monkeypatch.setattr(evaluate, "load_split", lambda name: pytest.fail("read the split before the adapter check"))
+    untrained = {k: dataclasses.replace(e, adapter=None) for k, e in registry.load().items()}  # C before #63
+    monkeypatch.setattr(registry, "load", lambda: untrained)
     with pytest.raises(ValueError, match="C has no adapter"):
         evaluate.main(["--config", str(config)])
 

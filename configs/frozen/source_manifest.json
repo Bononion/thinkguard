@@ -81,6 +81,24 @@
     "used_for": "released checkpoint R"
   },
   {
+    "name": "thinkguard-repro-L",
+    "kind": "model",
+    "url": "https://huggingface.co/thinkguard-repro/thinkguard-repro-L",
+    "revision": "c47d8161fc0f7dac3fde631890c6a0967063043f",
+    "license": "llama3.1",
+    "accessed_at": "2026-11-13",
+    "used_for": "frozen L adapter: checkpoint-896 of run 20261113-1744-train-7565b8e7 (#63)"
+  },
+  {
+    "name": "thinkguard-repro-C",
+    "kind": "model",
+    "url": "https://huggingface.co/thinkguard-repro/thinkguard-repro-C",
+    "revision": "732211ec3a23b096034ef101ab6ad6a83331b35a",
+    "license": "llama3.1",
+    "accessed_at": "2026-11-13",
+    "used_for": "frozen C adapter: checkpoint-1568 of run 20261112-2147-train-a88bcf0c (#63)"
+  },
+  {
     "name": "beavertails",
     "kind": "dataset",
     "url": "https://huggingface.co/datasets/PKU-Alignment/BeaverTails",
