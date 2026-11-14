@@ -211,6 +211,13 @@ all of them ran B out of memory on an L4. The score is the same function of the 
 - Prompt-only inputs (ToxicChat, OpenAI Moderation) never occur in training, where every row has a response.
 - B is not run under Llama Guard 3's native template (#11's diagnostic), for the GPU budget. If B under the contract
   scores far below the paper's LLaMA Guard 3 row, it is run later as a labeled diagnostic.
+- B under the contract writes Llama Guard's own answer (`safe`, or `unsafe` then an `S1`-`S14` line), never a label
+  line, so its label metrics are 0 under Parsing. Diagnostic, written after looking at B's output formats and before
+  scoring them against gold: B's outputs are also read in that format. The text is cut at the first `<|eot_id|>`;
+  the first line, after leading whitespace and without trailing spaces, is the label if it is `safe` or `unsafe`,
+  else the output is invalid (wrong, as in Safety label). The Safety label metrics of that reading are stored as
+  `native.<metric>`: no AUPRC (the unsafe score does not read the text) and no categories (`S1`-`S14` are not
+  BeaverTails keys). They are reported next to B's official numbers and never replace them.
 - lr 2e-4, not the paper's 2e-5: the paper's lr is for full fine-tuning, and LoRA's best lr is about 10 times that
   ("LoRA Without Regret", Thinking Machines Lab, 2025).
 - `token_mean_all` is used without the pilot comparison with `segment_mean` (#62), for the GPU budget.
