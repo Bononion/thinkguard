@@ -11,10 +11,14 @@ Checkpoint revisions are pinned in `configs/frozen/source_manifest.json`. Every 
 | L | B + `label_category` LoRA | autoregressive | label-only ablation of C |
 | C | B + critique LoRA | autoregressive | our ThinkGuard reproduction |
 | R | `Rakancorle1/ThinkGuard` (released) | autoregressive | reference only |
+| E-AR | C's adapter after early-exit adaptation | autoregressive | extension: quality |
+| E-SSD | the same checkpoint as E-AR | self-speculative (exit `h`, `k` draft tokens) | extension: speed |
 
 - In code the label-only condition is named `label_category`: it keeps category supervision and drops only the
   critique.
-- The early-exit extension's conditions are added once the reproduction is done (#63).
+- E-AR and E-SSD are one checkpoint and two decoding modes. E-SSD is transformers'
+  `generate(assistant_early_exit=h, num_assistant_tokens=k)`: the first `h` layers draft, the full model verifies
+  greedily, so its tokens equal E-AR's up to bf16 numerics (#80).
 
 ## Research questions
 
@@ -26,6 +30,8 @@ differences use the cluster bootstrap (#65).
 | 1 | Does training on critiques improve the guard over training on labels alone? | L vs C | unsafe F1 per test set; BeaverTails category macro F1 | `results/table_reproduction.md` |
 | 2 | Does LoRA adaptation improve over the base guard? | B vs L, B vs C | unsafe F1, precision, recall, AUPRC per test set | `results/table_reproduction.md` |
 | 3 | How close is our reproduction to the released ThinkGuard and the paper? | R vs C (reference only) | unsafe F1 per test set | `results/table_reproduction.md` |
+| 4 | Does early-exit adaptation keep C's quality? | E-AR vs C | unsafe F1 per test set | `results/table_extension.md` |
+| 5 | Does self-speculative decoding make the guard faster with the same outputs? | E-SSD vs E-AR | token-ID equality; latency and throughput (#89) | `results/table_extension.md` |
 
 R is a reference: it is trained with full fine-tuning on data and settings we cannot fully check, so question 3 gets
 no significance test and no claim beyond "close" or "not close".
@@ -135,6 +141,18 @@ rows), never a test set.
 - The paper saves a checkpoint every 500 steps and does not say how it picks one (Section 4.1): selecting on
   validation is our rule, not the paper's.
 
+### Extension (E)
+
+- Checkpoint: as for L and C (Checkpoint selection), from E-AR's decision-only generation.
+- Quality tolerance: E-AR's validation `unsafe_f1` may be at most 1.0 point below C's best validation `unsafe_f1`.
+  If no E checkpoint is within it, E is reported as outside the tolerance, not replaced.
+- Exits, exit-loss weights and duration (#71): of 2-4 pilot configs, the one with the highest exit agreement (#70)
+  among those within the quality tolerance.
+- Exit `h` and draft length `k` (#83, #84), from a grid fixed in a config before screening, on validation only:
+  keep the pairs whose E-SSD token IDs equal E-AR's on every row, or whose every mismatch is a traced near-tie (#80);
+  then those that fit in GPU memory; then pick the lowest median end-to-end latency per request. If none is faster
+  than E-AR, the fastest is kept and reported as no gain.
+
 ### Loss convention (#62)
 
 - `token_mean_all`: cross-entropy summed over every supervised token of an optimizer step's 32 examples, divided by
@@ -190,9 +208,8 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
 ### When test numbers are read
 
 - R at the gate (#12, #13); B after the gate (#64); L and C after their checkpoints are frozen (#63).
-- The extension's selection rules (the E vs C quality tolerance, the exit-depth and draft-length rule) are added to
-  this section and committed before L or C runs on a test set (#17, #18), so no extension rule is written after
-  seeing their test numbers.
+- E-AR and E-SSD after E and `(h, k)` are frozen (#73, #84). The extension's rules (Selection rules, Extension) are
+  committed before L or C runs on a test set (#17, #18), so none is written after seeing their test numbers.
 
 ## Deviations
 
@@ -209,6 +226,10 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
   ("LoRA Without Regret", Thinking Machines Lab, 2025).
 - `token_mean_all` is used without the pilot comparison with `segment_mean` (#62), for the GPU budget.
 - The overfit sanity check (#14) runs on B, not on Llama Guard 3-1B, so it also checks B's memory and lr.
+- E is trained with LayerSkip's early-exit loss only, without its layer dropout (#68): simpler, and less risk to C's
+  quality. Layer dropout is added only if the draft acceptance measured in #70 is too low.
+- E-SSD drafts with transformers' built-in early exit, which recomputes the first `h` layers when verifying instead
+  of reusing them as LayerSkip's own decoder does (#37). The measured speedup is a lower bound of LayerSkip's.
 
 ## Training data filtering
 
