@@ -190,6 +190,8 @@ R runs on the test sets before any of our conditions, so the gate is the one pla
 code. A fix after a `FAIL` must name a concrete cause (template, parsing, scoring), applies to every condition, and is
 logged in `results/gate.md` with R's numbers before and after. No setting is changed only to move R toward the paper.
 Once the gate passes, the evaluation code is tagged `harness-frozen` in git before B, L or C runs on a test set.
+One change came after the tag: `forward_score` keeps only the last position's logits (`logits_to_keep=1`), because
+all of them ran B out of memory on an L4. The score is the same function of the same logits.
 
 ### When test numbers are read
 
