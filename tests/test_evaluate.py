@@ -1,11 +1,15 @@
 """thinkguard.evaluate: config checks, and the test-set firewall on a throwaway git repo in tmp_path."""
 
+import dataclasses
 import subprocess
 
 import pytest
 
 from thinkguard import evaluate, runs
+from thinkguard.config import load
+from thinkguard.data.sources import TEST_SETS
 from thinkguard.evaluate import EvalConfig, check_firewall
+from thinkguard.paths import ROOT
 
 
 def git(repo, *args):
@@ -90,3 +94,11 @@ def test_config_rejects_bad_values(field, value, match):
     EvalConfig(**GOOD)
     with pytest.raises(ValueError, match=match):
         EvalConfig(**GOOD | {field: value})
+
+
+@pytest.mark.parametrize("split", TEST_SETS)
+def test_frozen_test_configs_differ_from_rs_only_in_condition(split):
+    """B, L and C run on each test set with the settings R passed the harness gate with (protocol.md, Harness gate)."""
+    configs = {c: dataclasses.asdict(load(ROOT / f"configs/frozen/{c}_test_{split}.yaml", EvalConfig)) for c in "RBLC"}
+    for c in "BLC":
+        assert {k for k in configs[c] if configs[c][k] != configs["R"][k]} == {"condition"}
