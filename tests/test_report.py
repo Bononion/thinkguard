@@ -48,6 +48,14 @@ def test_score_run(split):
                        (0.0, 0.25) if r < 3 else (0.5, 0.5), strict=True)}  # fmt: skip
 
 
+def test_score_run_reads_b_in_llama_guards_format_without_categories():
+    manifest, predictions = run("test_beavertails_30k_test")
+    manifest["config"]["condition"] = "B"
+    s = score_run(manifest, predictions, EXAMPLES)
+    assert s["unsafe_f1"] == 0.4 and s["coverage"] == 0.25  # only b's "unsafe" is valid: tp 1, fp 2, fn 1
+    assert not any(k.startswith(("category_", "per_category.", "paper.")) for k in s)
+
+
 @pytest.mark.parametrize(
     "change, match",
     [

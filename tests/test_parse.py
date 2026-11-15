@@ -7,7 +7,7 @@ from collections import Counter
 
 import pytest
 
-from thinkguard.evaluation.parse import parse
+from thinkguard.evaluation.parse import NATIVE, parse
 
 SAFE, UNSAFE, EOS = "- Safety Assessment: safe", "- Safety Assessment: unsafe", "<|eot_id|>"
 HATE, NONVIOLENT = "hate_speech,offensive_language", "non_violent_unethical_behavior"
@@ -63,3 +63,13 @@ def test_parse_reads_a_label_only_from_an_exact_first_line():
         assert parse(text).label == expected, repr(text)
         seen[expected] += 1
     assert seen["safe"] and seen["unsafe"] and seen[None], seen  # the strings reach every outcome
+
+
+@pytest.mark.parametrize(
+    "text, label",
+    [("safe<|eot_id|>", "safe"), ("\n\nunsafe  \nS1<|eot_id|>", "unsafe"), ("- Safety Assessment: safe", None),
+     ("Unsafe", None), ("S1<|eot_id|>", None), ("<|eot_id|>unsafe", None), ("safe, but", None)],
+)  # fmt: skip
+def test_native_labels_read_only_a_bare_safe_or_unsafe_first_line(text, label):
+    p = parse(text, NATIVE)
+    assert p.label == label and not p.categories  # B's S1-S14 line is never a Categories line

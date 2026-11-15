@@ -6,6 +6,7 @@ from thinkguard.data.critique_format import CONTRADICTION, load_keys, regroup
 from thinkguard.prompts import EOS, EXPLANATION
 
 LABELS = {"- Safety Assessment: safe": "safe", "- Safety Assessment: unsafe": "unsafe"}  # the only valid label lines
+NATIVE = {"safe": "safe", "unsafe": "unsafe"}  # B's label lines, Llama Guard's own format (protocol.md, Deviations)
 CATEGORIES = "- Categories:"
 KEYS = load_keys()
 
@@ -18,18 +19,19 @@ class Parsed:
     flags: frozenset[str]  # some of invalid_label, unknown_category, contradiction, truncated
 
 
-def parse(text):
+def parse(text, labels=LABELS):
     """The Parsed reading of generated text (the prompt excluded), by protocol.md, Parsing.
 
     The text is cut at the first <|eot_id|>. label is None unless the first line, after leading whitespace and without
-    trailing spaces, is one of LABELS. categories come from a Categories line right after an unsafe label line.
-    explanation is the stripped text after the first "\\n- Explanation:", or None without one. Flags never change
-    the label: truncated means the text has no <|eot_id|> and does not end at the decision-only stop.
+    trailing spaces, is a key of labels (LABELS, or NATIVE for B). categories come from a Categories line right after
+    an unsafe label line. explanation is the stripped text after the first "\\n- Explanation:", or None without one.
+    Flags never change the label: truncated means the text has no <|eot_id|> and does not end at the decision-only
+    stop.
     """
     ended = EOS in text
     text = text.split(EOS, 1)[0]
     lines = text.lstrip().split("\n")
-    label = LABELS.get(lines[0].rstrip(" "))
+    label = labels.get(lines[0].rstrip(" "))
     flags = set() if label else {"invalid_label"}
     categories = frozenset()
     if label == "unsafe" and len(lines) > 1 and lines[1].startswith(CATEGORIES):
