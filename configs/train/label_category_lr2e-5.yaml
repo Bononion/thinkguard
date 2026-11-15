@@ -1,0 +1,11 @@
+# L at the paper's lr 2e-5 for 5 epochs: a post-hoc variant (protocol.md, Deviations). Otherwise label_category.yaml.
+mode: train_label_category
+train_split: train
+eval_split: validation
+max_length: 2048  # protocol.md, Other choices
+lr: 2.0e-5
+epochs: 5
+evals_per_epoch: 4  # protocol.md, Checkpoint selection
+microbatch: 8
+grad_accum: 4
+seed: 0

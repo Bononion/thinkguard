@@ -11,6 +11,7 @@ export HF_HOME=/path/to/persistent/hf_cache       # model downloads
 export CKPT_DIR=/path/to/persistent/checkpoints   # LoRA checkpoints
 export HF_TOKEN=<your read token>                 # needed for gated models (Llama Guard 3-8B)
 export THINKGUARD_RUNS=/path/to/persistent/runs   # run directories; on Colab, a Drive folder survives a disconnect
+export THINKGUARD_HUB_REPO=<org>/<private repo>   # optional: runs are mirrored there (needs a write HF_TOKEN)
 bash scripts/setup_env.sh                         # ends by printing versions and whether CUDA is available
 ```
 
@@ -58,6 +59,7 @@ uv run python -m thinkguard.evaluate --config configs/eval/smoke_C.yaml --adapte
 uv run python -m thinkguard.train --config configs/train/pilot_critique.yaml     # #61, then pilot_label_category
 uv run python -m thinkguard.train --config configs/train/critique.yaml           # C; label_category.yaml for L
 uv run python -m thinkguard.train --config configs/train/critique.yaml --resume $THINKGUARD_RUNS/<id>  # after a disconnect
+uv run python -m thinkguard.train --config configs/train/critique_lr2e-5.yaml   # the lr 2e-5 variant; label_category_lr2e-5.yaml for L
 ```
 
 Each run prints its directory. It is scored on validation 4 times per epoch (`validation/step-<n>.jsonl`, with
