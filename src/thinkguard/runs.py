@@ -8,6 +8,10 @@ if it returns, "interrupted" on SIGINT or SIGTERM (a Colab disconnect), "failed"
 exception is re-raised. A run killed without a signal it can catch keeps "running" and no end time.
 start_run(..., run_dir=<an earlier run>) goes on in that directory instead (an evaluation resumed after a disconnect).
 The time in the run ID and in start and end is UTC; hash8 is the first 8 hex digits of the config hash.
+
+With THINKGUARD_HUB_REPO set (and a write HF_TOKEN), every run is mirrored to that private Hub repo under <run id>/
+when its block exits, and a training run after every checkpoint too (push). To resume one on a fresh machine:
+huggingface_hub.snapshot_download(repo, allow_patterns=f"{run_id}/*", local_dir=RUNS), then --resume RUNS/<run id>.
 """
 
 import contextlib
@@ -22,12 +26,30 @@ import signal
 import subprocess
 from pathlib import Path
 
+from huggingface_hub import HfApi
+
 from thinkguard.config import config_hash
 from thinkguard.data.manifest import MANIFESTS
 from thinkguard.paths import ROOT
 
 RUNS = Path(os.environ.get("THINKGUARD_RUNS", ROOT / "runs"))  # point it at persistent storage on Colab
 CODE = ("src", "configs", "scripts")  # an untracked file here can change what a run does
+HUB = os.environ.get("THINKGUARD_HUB_REPO")  # a private Hub repo runs are mirrored to, e.g. thinkguard-repro/runs
+API = HfApi()  # its background uploads run one at a time, in order
+
+
+def push(run_dir):
+    """The Future of a background upload of run_dir to HUB under <run id>/, or None without HUB. The upload mirrors
+    run_dir: a file deleted there, like an older checkpoint's optimizer state, is deleted on the Hub too. A failed
+    upload is printed, never raised, so it cannot stop a run.
+    """
+    if not HUB:
+        return None
+    future = API.upload_folder(
+        repo_id=HUB, folder_path=run_dir, path_in_repo=run_dir.name, delete_patterns="*", run_as_future=True
+    )
+    future.add_done_callback(lambda f: f.exception() and print(f"push to {HUB} failed: {f.exception()}", flush=True))
+    return future
 
 
 def git(*args):
@@ -103,6 +125,7 @@ def start_run(stage, config, splits=(), parent=None, runs=RUNS, manifests=MANIFE
     exists.
     With run_dir, that earlier run's directory instead: its manifest keeps run_id and start and is otherwise rewritten.
     Raises ValueError, before writing, if either run has git_dirty or a field of same_outputs differs.
+    With HUB, creates that repo (private) if needed first, and pushes the run once its final manifest is written.
     Must be entered from the main thread, where SIGTERM can be handled.
     """
     start, h = now(), config_hash(config)
@@ -122,6 +145,8 @@ def start_run(stage, config, splits=(), parent=None, runs=RUNS, manifests=MANIFE
         "environment": environment(),
         "packages_sha256": packages_sha256(),
     }
+    if HUB:  # fail before any work if the token cannot write there
+        API.create_repo(HUB, private=True, exist_ok=True)
     if run_dir is None:
         run_dir = runs / manifest["run_id"]
         run_dir.mkdir(parents=True)
@@ -149,3 +174,5 @@ def start_run(stage, config, splits=(), parent=None, runs=RUNS, manifests=MANIFE
         signal.signal(signal.SIGTERM, previous)
         manifest["end"] = now().isoformat(timespec="seconds")
         write(run_dir, manifest)
+        if HUB:  # wait for the final state to be on the Hub before the process can exit
+            push(run_dir).exception()

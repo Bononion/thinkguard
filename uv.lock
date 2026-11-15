@@ -893,6 +893,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
+    { name = "huggingface-hub" },
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
@@ -913,6 +914,7 @@ gpu = [
 [package.metadata]
 requires-dist = [
     { name = "datasets", specifier = "==4.0.0" },
+    { name = "huggingface-hub", specifier = "==0.36.2" },
     { name = "pyarrow", specifier = "==26.0.0" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "scikit-learn", specifier = "==1.9.1" },

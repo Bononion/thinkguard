@@ -67,8 +67,8 @@ class GuardTrainer(Trainer):
 
 
 class Checkpoints(TrainerCallback):
-    """Scores and saves at the last step too, and deletes the optimizer state of every checkpoint but the latest,
-    which --resume needs (about 0.3 GB each for B).
+    """Scores and saves at the last step too, deletes the optimizer state of every checkpoint but the latest, which
+    --resume needs (about 0.3 GB each for B), then mirrors the run directory to the Hub (runs.push).
     """
 
     def on_step_end(self, args, state, control, **kwargs):
@@ -79,6 +79,7 @@ class Checkpoints(TrainerCallback):
         saved = sorted(Path(args.output_dir).glob("checkpoint-*"), key=lambda d: int(d.name.split("-")[1]))
         for d in saved[:-1]:
             (d / "optimizer.pt").unlink(missing_ok=True)
+        runs.push(Path(args.output_dir))
 
 
 def trainable_params(model):

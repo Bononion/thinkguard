@@ -1,5 +1,6 @@
 """thinkguard.runs: each way a run ends, and the git and split fields of its manifest."""
 
+import concurrent.futures
 import json
 import signal
 import subprocess
@@ -30,6 +31,26 @@ def test_completed_run_records_config_splits_and_end(tmp_path):
     assert m["run_id"] == d.name and d.name.endswith(f"-eval-{config_hash(Toy())[:8]}")
     assert m["config"] == {"seed": 7} and m["seed"] == 7 and m["parent"] == "ckpt/C"
     assert m["splits"] == {"toy": "ab" * 32}
+
+
+def test_with_a_hub_repo_a_run_is_mirrored_there_once_its_manifest_is_final(tmp_path, monkeypatch):
+    calls = []
+
+    class Api:
+        def create_repo(self, repo_id, private, exist_ok):
+            calls.append(("create", repo_id, private))
+
+        def upload_folder(self, repo_id, folder_path, path_in_repo, delete_patterns, run_as_future):
+            calls.append(("upload", repo_id, path_in_repo, delete_patterns, manifest(folder_path)["status"]))
+            future = concurrent.futures.Future()
+            future.set_exception(OSError("offline"))  # a failed upload is printed, not raised
+            return future
+
+    monkeypatch.setattr(runs, "HUB", "org/runs")
+    monkeypatch.setattr(runs, "API", Api())
+    with start_run("eval", Toy(), runs=tmp_path) as d:
+        assert calls == [("create", "org/runs", True)]
+    assert calls[1:] == [("upload", "org/runs", d.name, "*", "completed")]
 
 
 def test_exception_marks_failed_and_is_reraised(tmp_path):

@@ -10,6 +10,7 @@ torch = pytest.importorskip("torch")
 
 from peft import LoraConfig  # noqa: E402
 
+from thinkguard import runs  # noqa: E402
 from thinkguard.config import load  # noqa: E402
 from thinkguard.models import load as load_model  # noqa: E402
 from thinkguard.paths import ROOT  # noqa: E402
@@ -85,9 +86,10 @@ def test_l_and_c_rows_come_in_the_same_batches_and_order(tiny_model, tmp_path):
     assert order(l_rows) == c_order and sorted(sum(c_order, [])) == list(range(24))
 
 
-def test_scored_checkpoints_match_a_standalone_predict(tiny_model, tmp_path):
-    """5 steps, scored every ceil(5 / 2) = 3 and at the last: checkpoints 3 and 5, the optimizer state in 5 only, and
-    checkpoint 3's adapter reloaded and run through predict gives the bytes the training run scored.
+def test_scored_checkpoints_match_a_standalone_predict(tiny_model, tmp_path, monkeypatch):
+    """5 steps, scored every ceil(5 / 2) = 3 and at the last: checkpoints 3 and 5, the optimizer state in 5 only, the
+    run pushed after each save, and checkpoint 3's adapter reloaded and run through predict gives the bytes the
+    training run scored.
     """
     from peft import PeftModel
     from test_prompts import example
@@ -100,7 +102,10 @@ def test_scored_checkpoints_match_a_standalone_predict(tiny_model, tmp_path):
     config = dataclasses.replace(CONFIG, microbatch=1, grad_accum=1, epochs=1, evals_per_epoch=2)
     model = lora_model(tiny_model, dropout=0.5)  # so scoring in train mode would not match
     trainer = make_trainer(model, config, synthetic_rows() + synthetic_rows()[:1], tmp_path, examples, **CPU)
+    pushed = []
+    monkeypatch.setattr(runs, "push", lambda d: pushed.append(sorted(c.name for c in d.glob("checkpoint-*"))))
     trainer.train()
+    assert pushed == [["checkpoint-3"], ["checkpoint-3", "checkpoint-5"]]  # each push has the checkpoint just saved
     assert sorted(d.name for d in tmp_path.glob("checkpoint-*")) == ["checkpoint-3", "checkpoint-5"]
     assert [p.parent.name for p in tmp_path.glob("checkpoint-*/optimizer.pt")] == ["checkpoint-5"]
     assert [h["step"] for h in trainer.state.log_history if "eval_unsafe_f1" in h] == [3, 5]
