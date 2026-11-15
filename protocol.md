@@ -224,6 +224,10 @@ Once the gate passes, the evaluation code is tagged `harness-frozen` in git befo
   scores far below the paper's LLaMA Guard 3 row, it is run later as a labeled diagnostic.
 - lr 2e-4, not the paper's 2e-5: the paper's lr is for full fine-tuning, and LoRA's best lr is about 10 times that
   ("LoRA Without Regret", Thinking Machines Lab, 2025).
+- L and C are also trained at the paper's lr 2e-5, for 5 epochs (`configs/train/*_lr2e-5.yaml`), every other setting
+  and the checkpoint rule unchanged; their checkpoints are chosen and frozen before they run on a test set. Decided on
+  2026-11-15, after the lr 2e-4 runs' test numbers had been seen (#123): a post-hoc variant. The lr 2e-4 runs stay
+  the pre-registered result, and both are reported.
 - `token_mean_all` is used without the pilot comparison with `segment_mean` (#62), for the GPU budget.
 - The overfit sanity check (#14) runs on B, not on Llama Guard 3-1B, so it also checks B's memory and lr.
 - E is trained with LayerSkip's early-exit loss only, without its layer dropout (#68): simpler, and less risk to C's
