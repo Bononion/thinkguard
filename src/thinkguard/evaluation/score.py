@@ -65,5 +65,6 @@ def forward_score(model, prompts):
     ids = torch.tensor([[0] * (n - len(s)) + s for s in seqs], device=model.device)
     mask = torch.tensor([[0] * (n - len(s)) + [1] * len(s) for s in seqs], device=model.device)
     positions = (mask.cumsum(-1) - 1).clamp(min=0)
-    logits = model(input_ids=ids, attention_mask=mask, position_ids=positions).logits[:, -1].float()
+    # Only the last position's logits: all of them (batch x length x 128k vocab) ran an L4 out of memory on B.
+    logits = model(input_ids=ids, attention_mask=mask, position_ids=positions, logits_to_keep=1).logits[:, -1].float()
     return (logits[:, UNSAFE] - logits[:, SAFE]).tolist()

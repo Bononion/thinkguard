@@ -1,0 +1,6 @@
+# C on toxicchat_0124_test (#63). Frozen: never edited after its first run (protocol.md, Test-set firewall).
+condition: C
+split: test_toxicchat_0124_test
+mode: decision
+max_new_tokens: 128  # protocol.md, Other choices
+batch_size: 8  # 16 rows of 4034 tokens do not fit an L4

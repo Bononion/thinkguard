@@ -14,7 +14,7 @@ from collections import Counter
 from thinkguard.data.manifest import load_split
 from thinkguard.evaluation.metrics import category_metrics, flag_rates, safety_metrics
 from thinkguard.evaluation.paper import READINGS, beavertails_scores, choose
-from thinkguard.evaluation.parse import parse
+from thinkguard.evaluation.parse import LABELS, NATIVE, parse
 from thinkguard.paths import ROOT
 from thinkguard.runs import RUNS
 
@@ -38,9 +38,9 @@ def score_run(manifest, predictions, examples):
     dotted keys (confusion.unsafe.invalid, per_category.<key>.f1)} for one run. predictions are its predictions.jsonl
     rows, examples its split's Examples; a row's gold comes from the Example with its example_id. Only on
     CATEGORY_SPLIT: category metrics, and paper.<reading>.f1 / .accuracy for the paper's four BeaverTails readings
-    (thinkguard.evaluation.paper), as fractions like every other metric. Raises ValueError if the run did not
-    complete, the predictions' example ids are not the split's (missing, extra or repeated), or a row has another
-    config_hash than the manifest.
+    (thinkguard.evaluation.paper), as fractions like every other metric. B is read in Llama Guard's format (NATIVE)
+    and has neither (protocol.md, Deviations). Raises ValueError if the run did not complete, the predictions' example
+    ids are not the split's (missing, extra or repeated), or a row has another config_hash than the manifest.
     """
     run_id, h, config = manifest["run_id"], manifest["config_hash"], manifest["config"]
     if manifest["status"] != "completed":
@@ -52,12 +52,13 @@ def score_run(manifest, predictions, examples):
         )
     if any(p["config_hash"] != h for p in predictions):
         raise ValueError(f"{run_id}: a prediction has another config_hash than the manifest")
-    predicted = {p["example_id"]: (parse(p["text"]), p["unsafe_score"]) for p in predictions}
+    b = config["condition"] == "B"
+    predicted = {p["example_id"]: (parse(p["text"], NATIVE if b else LABELS), p["unsafe_score"]) for p in predictions}
     rows = [(e, *predicted[e.example_id]) for e in examples]
     out = {"run_id": run_id, "config_hash": h, **{k: config[k] for k in ("condition", "split", "mode")}}
     out |= flat(safety_metrics((e.gold_safety_label, p.label, s) for e, p, s in rows))
     out |= flag_rates((e.gold_safety_label, p.flags) for e, p, _ in rows)
-    if config["split"] == CATEGORY_SPLIT:
+    if config["split"] == CATEGORY_SPLIT and not b:  # S1-S14 are not BeaverTails keys
         out |= flat(
             category_metrics((e.gold_safety_label, e.gold_categories, p.label, p.categories) for e, p, _ in rows)
         )

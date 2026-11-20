@@ -1,0 +1,6 @@
+# L on wildguardtest (#63). Frozen: never edited after its first run (protocol.md, Test-set firewall).
+condition: L
+split: test_wildguardtest
+mode: decision
+max_new_tokens: 128  # protocol.md, Other choices
+batch_size: 8  # 16 rows of 4034 tokens do not fit an L4

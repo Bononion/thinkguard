@@ -1,11 +1,15 @@
 """thinkguard.evaluate: config checks, and the test-set firewall on a throwaway git repo in tmp_path."""
 
+import dataclasses
 import subprocess
 
 import pytest
 
-from thinkguard import evaluate, runs
+from thinkguard import evaluate, registry, runs
+from thinkguard.config import load
+from thinkguard.data.sources import TEST_SETS
 from thinkguard.evaluate import EvalConfig, check_firewall
+from thinkguard.paths import ROOT
 
 
 def git(repo, *args):
@@ -74,6 +78,8 @@ def test_evaluate_refuses_a_trained_condition_without_an_adapter(tmp_path, monke
     config = tmp_path / "x.yaml"
     config.write_text("condition: C\nsplit: smoke\nmode: decision\nmax_new_tokens: 8\nbatch_size: 4\n")
     monkeypatch.setattr(evaluate, "load_split", lambda name: pytest.fail("read the split before the adapter check"))
+    untrained = {k: dataclasses.replace(e, adapter=None) for k, e in registry.load().items()}  # C before #63
+    monkeypatch.setattr(registry, "load", lambda: untrained)
     with pytest.raises(ValueError, match="C has no adapter"):
         evaluate.main(["--config", str(config)])
 
@@ -90,3 +96,11 @@ def test_config_rejects_bad_values(field, value, match):
     EvalConfig(**GOOD)
     with pytest.raises(ValueError, match=match):
         EvalConfig(**GOOD | {field: value})
+
+
+@pytest.mark.parametrize("split", TEST_SETS)
+def test_frozen_test_configs_differ_from_rs_only_in_condition(split):
+    """B, L and C run on each test set with the settings R passed the harness gate with (protocol.md, Harness gate)."""
+    configs = {c: dataclasses.asdict(load(ROOT / f"configs/frozen/{c}_test_{split}.yaml", EvalConfig)) for c in "RBLC"}
+    for c in "BLC":
+        assert {k for k in configs[c] if configs[c][k] != configs["R"][k]} == {"condition"}

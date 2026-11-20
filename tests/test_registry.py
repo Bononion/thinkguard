@@ -26,6 +26,7 @@ def test_committed_registry_has_the_reproduction_conditions():
         ([entry("L", parent="X")], "L: parent 'X' is not an entry"),
         ([entry("A", parent="B"), entry("B", parent="A")], "A: parents form a cycle"),
         ([entry("B", adapter="ckpt/B")], "B: an adapter needs a parent"),
+        ([entry("B"), entry("C", parent="B", adapter="ckpt/C")], "C: adapter 'ckpt/C' is not a model"),
         ([entry("B", base="paper")], "B: base 'paper' is not a model"),
         ([entry("B", decode="sample")], "B: decode 'sample'"),
         ([entry("B") | {"parnet": None}], r"unknown keys \['parnet'\]"),
