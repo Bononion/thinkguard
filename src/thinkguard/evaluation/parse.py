@@ -46,3 +46,14 @@ def parse(text, labels=LABELS):
     if not ended and not text.endswith(EXPLANATION):
         flags.add("truncated")
     return Parsed(label, categories, explanation, frozenset(flags))
+
+
+def lenient_label(text, labels=LABELS):
+    """The label of the first line anywhere in text, cut at the first <|eot_id|>, that is a key of labels after leading
+    whitespace and without trailing spaces, or None if no line is (protocol.md, Parsing, Lenient label). Whenever
+    parse gives a label, this is the same label.
+    """
+    for line in text.split(EOS, 1)[0].split("\n"):
+        if label := labels.get(line.lstrip().rstrip(" ")):
+            return label
+    return None

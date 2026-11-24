@@ -7,7 +7,7 @@ from collections import Counter
 
 import pytest
 
-from thinkguard.evaluation.parse import NATIVE, parse
+from thinkguard.evaluation.parse import NATIVE, lenient_label, parse
 
 SAFE, UNSAFE, EOS = "- Safety Assessment: safe", "- Safety Assessment: unsafe", "<|eot_id|>"
 HATE, NONVIOLENT = "hate_speech,offensive_language", "non_violent_unethical_behavior"
@@ -73,3 +73,29 @@ def test_parse_reads_a_label_only_from_an_exact_first_line():
 def test_native_labels_read_only_a_bare_safe_or_unsafe_first_line(text, label):
     p = parse(text, NATIVE)
     assert p.label == label and not p.categories  # B's S1-S14 line is never a Categories line
+
+
+@pytest.mark.parametrize(
+    "text, labels, label",
+    [(f"- Translation: hola\n{UNSAFE}\n- Categories: self_harm{EOS}", None, "unsafe"),  # C's extra first line
+     (f"- Translation: x\n{SAFE}\n{UNSAFE}", None, "safe"),  # the first label line wins
+     (f"- Translation: x\n  {UNSAFE}  ", None, "unsafe"),  # leading whitespace, trailing spaces
+     (f"- Translation: x\n{UNSAFE}.", None, None),  # still an exact line
+     (f"- Translation: x {UNSAFE}", None, None),  # not a line of its own
+     (f"- Translation: x{EOS}\n{UNSAFE}", None, None),  # after EOS
+     ("Answer:\nunsafe\nS1", NATIVE, "unsafe"),  # B's own lines for B
+     (f"Answer:\n{UNSAFE}", NATIVE, None)],
+)  # fmt: skip
+def test_lenient_label_reads_the_first_label_line_anywhere(text, labels, label):
+    assert lenient_label(text, *([labels] if labels else [])) == label
+    assert parse(text, *([labels] if labels else [])).label is None  # none of these has a first-line label
+
+
+def test_lenient_label_never_changes_a_first_line_label():
+    rng, gained = random.Random(0), 0
+    for _ in range(5000):
+        text = "".join(rng.choice([*PIECES, SAFE, UNSAFE]) for _ in range(rng.randint(0, 8)))
+        first, lenient = parse(text).label, lenient_label(text)
+        assert first is None or lenient == first, repr(text)
+        gained += first is None and lenient is not None
+    assert gained  # the strings also reach a label line after the first line

@@ -53,7 +53,17 @@ def test_score_run_reads_b_in_llama_guards_format_without_categories():
     manifest["config"]["condition"] = "B"
     s = score_run(manifest, predictions, EXAMPLES)
     assert s["unsafe_f1"] == 0.4 and s["coverage"] == 0.25  # only b's "unsafe" is valid: tp 1, fp 2, fn 1
+    assert s["lenient.unsafe_f1"] == 0.4  # B's own lines for the lenient label too
     assert not any(k.startswith(("category_", "per_category.", "paper.")) for k in s)
+
+
+def test_score_run_reads_a_label_line_after_the_first_line_leniently():
+    manifest, predictions = run("test_toxicchat_0124_test")
+    predictions[2]["text"] = f"- Translation: x\n{UNSAFE}"  # b (ROWS reversed): no first-line label, unsafe after it
+    s = score_run(manifest, predictions, EXAMPLES)
+    assert s["unsafe_f1"] == 0.5 and s["confusion.unsafe.invalid"] == 1  # the first-line reading is unchanged
+    assert s["lenient.unsafe_f1"] == 0.8 and s["lenient.coverage"] == 1.0  # b a true positive: tp 2, fp 1, fn 0
+    assert s["lenient.confusion.unsafe.unsafe"] == 2 and "lenient.unsafe_auprc" not in s
 
 
 @pytest.mark.parametrize(

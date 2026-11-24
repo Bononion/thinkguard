@@ -14,7 +14,7 @@ from collections import Counter
 from thinkguard.data.manifest import load_split
 from thinkguard.evaluation.metrics import category_metrics, flag_rates, safety_metrics
 from thinkguard.evaluation.paper import READINGS, beavertails_scores, choose
-from thinkguard.evaluation.parse import LABELS, NATIVE, parse
+from thinkguard.evaluation.parse import LABELS, NATIVE, lenient_label, parse
 from thinkguard.paths import ROOT
 from thinkguard.runs import RUNS
 
@@ -22,6 +22,7 @@ RESULTS = ROOT / "results"
 CATEGORY_SPLIT = "test_beavertails_30k_test"  # protocol.md, Categories (BeaverTails test only)
 META = ("run_id", "config_hash", "condition", "split", "mode")
 GATED = ("beavertails_30k_test", "toxicchat_0124_test", "wildguardtest")  # protocol.md, Harness gate
+LENIENT = ("unsafe_f1", "unsafe_precision", "unsafe_recall", "coverage", "confusion")  # protocol.md, Safety label
 TOLERANCE = 2.0  # percentage points
 
 
@@ -39,8 +40,9 @@ def score_run(manifest, predictions, examples):
     rows, examples its split's Examples; a row's gold comes from the Example with its example_id. Only on
     CATEGORY_SPLIT: category metrics, and paper.<reading>.f1 / .accuracy for the paper's four BeaverTails readings
     (thinkguard.evaluation.paper), as fractions like every other metric. B is read in Llama Guard's format (NATIVE)
-    and has neither (protocol.md, Deviations). Raises ValueError if the run did not complete, the predictions' example
-    ids are not the split's (missing, extra or repeated), or a row has another config_hash than the manifest.
+    and has neither (protocol.md, Deviations). lenient.<metric>, for each metric in LENIENT, is from the lenient label
+    (lenient_label, B's lines for B). Raises ValueError if the run did not complete, the predictions' example ids are
+    not the split's (missing, extra or repeated), or a row has another config_hash than the manifest.
     """
     run_id, h, config = manifest["run_id"], manifest["config_hash"], manifest["config"]
     if manifest["status"] != "completed":
@@ -53,10 +55,14 @@ def score_run(manifest, predictions, examples):
     if any(p["config_hash"] != h for p in predictions):
         raise ValueError(f"{run_id}: a prediction has another config_hash than the manifest")
     b = config["condition"] == "B"
-    predicted = {p["example_id"]: (parse(p["text"], NATIVE if b else LABELS), p["unsafe_score"]) for p in predictions}
+    labels = NATIVE if b else LABELS
+    predicted = {p["example_id"]: (parse(p["text"], labels), p["unsafe_score"]) for p in predictions}
+    lenient = {p["example_id"]: lenient_label(p["text"], labels) for p in predictions}
     rows = [(e, *predicted[e.example_id]) for e in examples]
     out = {"run_id": run_id, "config_hash": h, **{k: config[k] for k in ("condition", "split", "mode")}}
     out |= flat(safety_metrics((e.gold_safety_label, p.label, s) for e, p, s in rows))
+    m = safety_metrics((e.gold_safety_label, lenient[e.example_id], s) for e, _, s in rows)
+    out |= flat({k: m[k] for k in LENIENT}, "lenient.")
     out |= flag_rates((e.gold_safety_label, p.flags) for e, p, _ in rows)
     if config["split"] == CATEGORY_SPLIT and not b:  # S1-S14 are not BeaverTails keys
         out |= flat(
