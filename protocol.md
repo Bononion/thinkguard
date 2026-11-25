@@ -114,6 +114,16 @@ output predicts none. Over the 14 BeaverTails categories (`configs/data/sources.
   rows are left out because an empty set on a correctly labeled safe row would count as an exact match.
 - Support: the gold rows per category, reported next to each per-category F1.
 
+### Paired differences (#65)
+
+- Pairs, per test set: C - L (question 1), L - B and C - B (question 2). R gets none (Research questions).
+- Difference: `lenient.unsafe_f1` of the first condition minus the second's, over the scored rows.
+- 95% CI: paired cluster bootstrap. A cluster is the test rows with one `prompt_hash` (BeaverTails has up to 5
+  responses per prompt). Each of 10,000 resamples draws as many clusters as the test set has, with replacement, and
+  scores both conditions on the same draw; the CI is the 2.5th and 97.5th percentiles of the 10,000 differences.
+  Seed 0 (`numpy.random.default_rng`). Invalid outputs count as wrong, as in the metric.
+- The CI covers test-set sampling only: each condition is one training run with one seed.
+
 ### Harness gate (#13)
 
 The paper counts an unsafe prediction as correct only if its categories are also correct (Section 4.2), so its F1 is
