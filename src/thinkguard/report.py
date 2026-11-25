@@ -2,8 +2,9 @@
 
 Run from the repo root: python -m thinkguard.report scores --runs <id> [<id> ...]
 Reads $THINKGUARD_RUNS/<id>/manifest.json and predictions.jsonl, and the split's rows (load_split). Writes
-results/scores.csv: one row per run and metric, with the run's id and config hash. Human-readable tables are built
-from it: python -m thinkguard.report gate writes results/gate.md (#13) from it and results/paper_targets.csv.
+results/scores.csv: one row per run and metric, with the run's id and config hash, and results/paired_diffs.csv: C - L,
+L - B and C - B per test set with bootstrap CIs (protocol.md, Paired differences). Human-readable tables are built
+from them: python -m thinkguard.report gate writes results/gate.md (#13) from scores.csv and results/paper_targets.csv.
 """
 
 import argparse
@@ -12,6 +13,7 @@ import json
 from collections import Counter
 
 from thinkguard.data.manifest import load_split
+from thinkguard.evaluation.bootstrap import RESAMPLES, SEED, paired_diff
 from thinkguard.evaluation.metrics import category_metrics, flag_rates, safety_metrics
 from thinkguard.evaluation.paper import READINGS, beavertails_scores, choose
 from thinkguard.evaluation.parse import LABELS, NATIVE, lenient_label, parse
@@ -23,6 +25,8 @@ CATEGORY_SPLIT = "test_beavertails_30k_test"  # protocol.md, Categories (BeaverT
 META = ("run_id", "config_hash", "condition", "split", "mode")
 GATED = ("beavertails_30k_test", "toxicchat_0124_test", "wildguardtest")  # protocol.md, Harness gate
 LENIENT = ("unsafe_f1", "unsafe_precision", "unsafe_recall", "coverage", "confusion")  # protocol.md, Safety label
+PAIRS = (("C", "L"), ("L", "B"), ("C", "B"))  # protocol.md, Paired differences
+DIFF_FIELDS = ("split", "a", "b", "metric", "diff", "ci_low", "ci_high", "resamples", "seed")
 TOLERANCE = 2.0  # percentage points
 
 
@@ -32,6 +36,12 @@ def flat(d, prefix=""):
     for k, v in d.items():
         out |= flat(v, f"{prefix}{k}.") if isinstance(v, dict) else {f"{prefix}{k}": v}
     return out
+
+
+def lenient_labels(manifest, predictions):
+    """{example_id: lenient label} of a run's predictions, in B's lines for B (protocol.md, Parsing)."""
+    labels = NATIVE if manifest["config"]["condition"] == "B" else LABELS
+    return {p["example_id"]: lenient_label(p["text"], labels) for p in predictions}
 
 
 def score_run(manifest, predictions, examples):
@@ -57,7 +67,7 @@ def score_run(manifest, predictions, examples):
     b = config["condition"] == "B"
     labels = NATIVE if b else LABELS
     predicted = {p["example_id"]: (parse(p["text"], labels), p["unsafe_score"]) for p in predictions}
-    lenient = {p["example_id"]: lenient_label(p["text"], labels) for p in predictions}
+    lenient = lenient_labels(manifest, predictions)
     rows = [(e, *predicted[e.example_id]) for e in examples]
     out = {"run_id": run_id, "config_hash": h, **{k: config[k] for k in ("condition", "split", "mode")}}
     out |= flat(safety_metrics((e.gold_safety_label, p.label, s) for e, p, s in rows))
@@ -74,6 +84,27 @@ def score_run(manifest, predictions, examples):
         out |= {
             f"paper.{r}.{k}": v / 100 for r, fa in paper.items() for k, v in zip(("f1", "accuracy"), fa, strict=True)
         }
+    return out
+
+
+def paired_diffs(runs):
+    """Rows of results/paired_diffs.csv (DIFF_FIELDS), one per pair (a, b) of PAIRS with a decision run of both on a
+    split: lenient.unsafe_f1 of a minus b and its paired_diff CI, clustered by prompt_hash, over the scored rows
+    (protocol.md, Paired differences). runs are (manifest, predictions, examples) as score_run takes them, at most one
+    per (condition, split, mode). Sorted by split, then in PAIRS' order.
+    """
+    labeled = {}
+    for m, p, ex in runs:
+        if m["config"]["mode"] == "decision":
+            labeled[m["config"]["split"], m["config"]["condition"]] = lenient_labels(m, p), ex
+    out = []
+    for split in sorted({s for s, _ in labeled}):
+        for a, b in PAIRS:
+            if (split, a) in labeled and (split, b) in labeled:
+                (la, examples), (lb, _) = labeled[split, a], labeled[split, b]
+                rows = [(e.prompt_hash, e.gold_safety_label, la[e.example_id], lb[e.example_id]) for e in examples]
+                diff, low, high, _ = paired_diff(r for r in rows if r[1] is not None)
+                out.append((split, a, b, "lenient.unsafe_f1", diff, low, high, RESAMPLES, SEED))
     return out
 
 
@@ -153,7 +184,7 @@ def gate(scores, targets):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Results tables from stored predictions.")
     tables = parser.add_subparsers(dest="table", required=True)
-    scores = tables.add_parser("scores", help="results/scores.csv")
+    scores = tables.add_parser("scores", help="results/scores.csv and results/paired_diffs.csv")
     scores.add_argument("--runs", nargs="+", required=True, help="run ids under THINKGUARD_RUNS")
     tables.add_parser("gate", help="results/gate.md from results/scores.csv")
     args = parser.parse_args(argv)
@@ -162,13 +193,18 @@ def main(argv=None):
         (RESULTS / "gate.md").write_text(text, encoding="utf-8", newline="\n")
         print(text.splitlines()[0])
         return
-    results = []
+    results, runs = [], []
     for run_id in args.runs:
         manifest = json.loads((RUNS / run_id / "manifest.json").read_text(encoding="utf-8"))
         lines = (RUNS / run_id / "predictions.jsonl").read_text(encoding="utf-8").splitlines()
-        results.append(score_run(manifest, [json.loads(x) for x in lines], load_split(manifest["config"]["split"])))
+        runs.append((manifest, [json.loads(x) for x in lines], load_split(manifest["config"]["split"])))
+        results.append(score_run(*runs[-1]))
     RESULTS.mkdir(exist_ok=True)
     write_scores(results, RESULTS / "scores.csv")
+    with open(RESULTS / "paired_diffs.csv", "w", encoding="utf-8", newline="") as f:
+        out = csv.writer(f, lineterminator="\n")
+        out.writerow(DIFF_FIELDS)
+        out.writerows(paired_diffs(runs))
 
 
 if __name__ == "__main__":

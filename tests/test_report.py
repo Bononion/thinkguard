@@ -89,8 +89,11 @@ def scores(tmp_path, monkeypatch):
     monkeypatch.setattr(report, "RESULTS", tmp_path)
     monkeypatch.setattr(report, "load_split", lambda name: EXAMPLES)
 
-    def write_run(run_id, split):
+    def write_run(run_id, split, condition="R", texts=None):
         manifest, predictions = run(split)
+        manifest["config"]["condition"] = condition
+        for p in predictions:
+            p["text"] = (texts or {}).get(p["example_id"], p["text"])
         d = tmp_path / "runs" / run_id
         d.mkdir(parents=True)
         (d / "manifest.json").write_text(json.dumps(manifest | {"run_id": run_id}), encoding="utf-8")
@@ -112,6 +115,20 @@ def test_scores_csv_is_the_same_bytes_whatever_the_order_of_runs(scores, tmp_pat
         ("r1", "h", "0.5"),
         ("r2", "h", "0.5"),
     }
+
+
+def test_scores_writes_the_paired_difference_of_c_and_l(scores, tmp_path):
+    main, write_run = scores
+    split = "test_toxicchat_0124_test"
+    write_run("l", split, "L")
+    write_run("c", split, "C", {"b": f"- Translation: x\n{UNSAFE}"})  # b only has a label line after the first
+    write_run("r", split, "R")  # R is never paired (protocol.md, Paired differences)
+    main("l", "c", "r")
+    rows = report.read_csv(tmp_path / "paired_diffs.csv")
+    assert [(r["split"], r["a"], r["b"], r["metric"]) for r in rows] == [(split, "C", "L", "lenient.unsafe_f1")]
+    # lenient F1 C 0.8 (b a true positive), L 0.5. The four rows share one prompt_hash, so every resample draws them all
+    got = [float(rows[0][k]) for k in ("diff", "ci_low", "ci_high")]
+    assert got == pytest.approx([0.3, 0.3, 0.3]) and (rows[0]["resamples"], rows[0]["seed"]) == ("10000", "0")
 
 
 def test_scores_refuses_two_runs_of_one_condition_split_and_mode(scores, tmp_path):
