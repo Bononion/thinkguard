@@ -893,6 +893,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "datasets" },
+    { name = "numpy" },
     { name = "pyarrow" },
     { name = "pyyaml" },
     { name = "scikit-learn" },
@@ -913,6 +914,7 @@ gpu = [
 [package.metadata]
 requires-dist = [
     { name = "datasets", specifier = "==4.0.0" },
+    { name = "numpy", specifier = "==2.4.6" },
     { name = "pyarrow", specifier = "==26.0.0" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "scikit-learn", specifier = "==1.9.1" },

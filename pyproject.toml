@@ -6,8 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "thinkguard"
 version = "0.1.0"
 requires-python = "==3.11.*"
-# transformers: the tokenizer; scikit-learn: AUPRC (protocol.md pins its average_precision_score)
-dependencies = ["datasets==4.0.0", "pyarrow==26.0.0", "pyyaml==6.0.3", "transformers==4.57.1", "scikit-learn==1.9.1"]
+# transformers: the tokenizer; scikit-learn: AUPRC (protocol.md pins its average_precision_score); numpy: bootstrap
+dependencies = [
+    "datasets==4.0.0",
+    "pyarrow==26.0.0",
+    "pyyaml==6.0.3",
+    "transformers==4.57.1",
+    "scikit-learn==1.9.1",
+    "numpy==2.4.6",
+]
 
 # uv sync installs dev by default; add --group gpu for training and eval (Linux + NVIDIA)
 [dependency-groups]
